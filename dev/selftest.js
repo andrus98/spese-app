@@ -15,7 +15,7 @@ import { makeZip } from '../js/zip.js';
 import { buildWorkbook } from '../js/export-xlsx.js';
 import { el } from '../js/ui.js';
 import { createSummaryScreen } from '../js/screen-summary.js';
-import { createSettingsSheet, assetsToRevalidate } from '../js/screen-settings.js';
+import { createSettingsSheet } from '../js/screen-settings.js';
 import { createMovementsScreen } from '../js/screen-movements.js';
 import { createIncomeScreen } from '../js/screen-income.js';
 import { createEntryScreen } from '../js/screen-entry.js';
@@ -1459,9 +1459,9 @@ async function run() {
   });
 
 
-  // Le misure hanno senso solo con un viewport vero: in un pannello
-  // collassato `100dvh` vale zero e qualunque geometria risulta sbagliata.
-  // Un test che non puo' girare deve dirlo, non dichiarare rotto il codice.
+  // Le misure hanno senso solo con un viewport vero: in un pannello collassato
+  // il guscio vale zero e qualunque geometria risulta sbagliata. Un test che
+  // non puo' girare deve dirlo, non dichiarare rotto il codice.
   const viewportUsabile = window.innerHeight >= 300 && window.innerWidth >= 200;
   const saltaSenzaViewport = (nome) => {
     if (viewportUsabile) return false;
@@ -1588,26 +1588,6 @@ async function run() {
       `scorrimento bloccato: touch-action = ${touch}`);
     assert(!/auto|manipulation|pinch-zoom/.test(touch),
       `zoom ancora concesso: touch-action = ${touch}`);
-  });
-
-  await test('l\'aggiornamento forzato riscarica tutto e solo il nostro', () => {
-    // Il documento c'e' sempre (non compare fra le risorse), i duplicati e i
-    // frammenti spariscono, e quello che non e' nostro resta fuori: le
-    // chiamate a GitHub non vanno in cache da nessuna parte.
-    const urls = assetsToRevalidate([
-      { name: 'https://tizio.github.io/spese/js/app.js' },
-      { name: 'https://tizio.github.io/spese/js/app.js' },
-      { name: 'https://tizio.github.io/spese/css/app.css#x' },
-      { name: 'https://api.github.com/repos/tizio/dati/contents/data' },
-      { name: 'blob:https://tizio.github.io/9f2c' },
-      null,
-    ], 'https://tizio.github.io', 'https://tizio.github.io/spese/#riepilogo');
-
-    eq(urls, [
-      'https://tizio.github.io/spese/',
-      'https://tizio.github.io/spese/js/app.js',
-      'https://tizio.github.io/spese/css/app.css',
-    ]);
   });
 
   await test('il service worker non mette MAI in cache i dati', async () => {

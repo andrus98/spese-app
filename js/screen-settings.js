@@ -31,7 +31,7 @@ export function createSettingsSheet(app) {
       body.append(el('div', { class: 'empty-state', text: 'Dati non ancora caricati.' }));
       return;
     }
-    body.append(yearBlock(), exportBlock(), importBlock(), updateBlock(), deviceBlock());
+    body.append(yearBlock(), exportBlock(), importBlock(), deviceBlock());
   }
 
   // --- Anno: chiusura in sola lettura (F8.3) -------------------------------
@@ -180,35 +180,6 @@ export function createSettingsSheet(app) {
     ]);
   }
 
-  // --- Aggiornamento forzato -----------------------------------------------
-
-  function updateBlock() {
-    const status = el('div', { class: 'status' });
-    const button = iconButton(uiIcon('refresh'), 'Aggiorna l\'app', {
-      class: 'btn ghost',
-      onclick: async () => {
-        button.disabled = true;
-        status.className = 'status wait';
-        try {
-          await hardRefresh((text) => { status.textContent = text; });
-        } catch (err) {
-          button.disabled = false;
-          status.className = 'status ko';
-          status.textContent = `${humanError(err)} Niente è stato toccato: riprova quando c'è rete.`;
-        }
-      },
-    });
-
-    return block('Aggiornamento', [
-      el('p', {
-        class: 'hint',
-        text: 'Sull\'iPhone l\'app resta quella salvata finché il sistema non decide di ricontrollare da solo: questo pulsante la costringe a riscaricare tutto adesso. Token, chiave e passphrase non vengono toccati — si butta via solo il codice.',
-      }),
-      button,
-      status,
-    ]);
-  }
-
   // --- Dispositivo ---------------------------------------------------------
 
   function deviceBlock() {
@@ -242,71 +213,3 @@ const block = (title, children) => el('div', { class: 'block' }, [
   el('div', { class: 'block-title', text: title }),
   el('div', { class: 'block-body stack' }, children),
 ]);
-
-// --- Aggiornamento forzato ---------------------------------------------------
-
-/**
- * Gli URL da riscaricare per aggiornare l'app: il documento più tutto ciò che
- * questa pagina ha caricato dalla propria origine.
- *
- * Si ricava dal timing delle risorse invece di essere un elenco scritto a
- * mano perché un elenco a mano si dimentica il modulo aggiunto il mese dopo,
- * e si dimentica in silenzio: l'app si aggiornerebbe a metà.
- *
- * Le richieste a GitHub restano fuori: hanno un'altra origine, e i dati non
- * si mettono in cache da nessuna parte.
- */
-export function assetsToRevalidate(entries, origin, href) {
-  const urls = new Set([String(href).split('#')[0]]);
-  for (const entry of entries ?? []) {
-    const name = String(entry?.name ?? '');
-    if (name.startsWith(`${origin}/`)) urls.add(name.split('#')[0]);
-  }
-  return [...urls];
-}
-
-/**
- * Aggiornamento forzato. Tre passaggi, in quest'ordine per un motivo:
- *
- * 1. riscarica dalla rete, saltando la cache HTTP (`cache: 'reload'`, che
- *    oltre a saltarla la AGGIORNA);
- * 2. solo se il punto 1 è riuscito, butta via service worker e cache;
- * 3. ricarica.
- *
- * Se si cancellasse prima e la rete cadesse dopo, resteremmo senza la copia
- * vecchia e senza quella nuova. Così un fallimento lascia tutto com'era.
- *
- * Credenziali: intatte. Token e repo stanno in localStorage, la chiave AES in
- * IndexedDB; nessuno dei due è toccato da `unregister()` o da `caches.delete()`,
- * che vivono in un altro archivio. Al riavvio la chiave si rilegge da lì e non
- * viene richiesta la passphrase.
- */
-async function hardRefresh(report) {
-  report('Scarico la versione nuova…');
-  const urls = assetsToRevalidate(
-    performance.getEntriesByType('resource'), location.origin, location.href,
-  );
-  let responses;
-  try {
-    responses = await Promise.all(urls.map((url) => fetch(url, { cache: 'reload' })));
-  } catch {
-    // Una fetch che non parte lancia un TypeError con dentro "Failed to
-    // fetch": vero, e inutile da leggere sul telefono.
-    throw new Error('Nessuna connessione.');
-  }
-  const failed = responses.find((response) => !response.ok);
-  if (failed) throw new Error(`${new URL(failed.url).pathname} non scaricabile (HTTP ${failed.status}).`);
-
-  report('Butto via la copia vecchia…');
-  if ('serviceWorker' in navigator) {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
-  }
-  if ('caches' in self) {
-    const names = await caches.keys();
-    await Promise.all(names.map((name) => caches.delete(name)));
-  }
-
-  report('Riavvio…');
-  location.reload();
-}
