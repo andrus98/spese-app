@@ -36,16 +36,20 @@
   --pad: 16px;
 
   --topbar-h: 52px;
-  --tabbar-h: 58px;
 
-  /* Quanto si tiene libero in fondo allo schermo. NON tutta l'area di
-     sicurezza: la barra home dell'iPhone e' una striscia sottile che arriva a
-     ~13px dal bordo, ma l'inset che iOS dichiara ne vale 34. Riservarlo per
-     intero — come fa la tab bar di sistema — lascia sotto le icone una fascia
-     vuota che su una barra di sole quattro voci si nota parecchio. Se ne
-     tengono 16: la striscia resta libera con tre pixel di margine e il resto
-     torna al contenuto. Senza notch l'inset e' 0 e la max() evita il negativo. */
-  --safe-b: max(0px, calc(env(safe-area-inset-bottom) - 18px));
+  /* Le due manopole della nav bar. `--tabbar-h` e' la fascia che contiene
+     icona e scritta; `--safe-b` e' il vuoto che resta sotto, verso il bordo.
+     Il grigio che avanza sotto le scritte e' la meta' bassa della prima piu'
+     tutta la seconda: per stringere ancora, cala questi due numeri. */
+  --tabbar-h: 52px;
+
+  /* NON tutta l'area di sicurezza. La barra home dell'iPhone e' una striscia
+     sottile che arriva a ~13px dal bordo, ma l'inset che iOS dichiara ne vale
+     34: riservarlo per intero — come fa la tab bar di sistema — lascia sotto
+     le scritte una fascia vuota che su una barra di sole quattro voci pesa.
+     Se ne tengono 12, quanto basta a non finire sotto la striscia. Senza
+     notch l'inset e' 0 e la max() evita un valore negativo. */
+  --safe-b: max(0px, calc(env(safe-area-inset-bottom) - 22px));
 
   --ease: cubic-bezier(.32, .72, 0, 1);
 }
@@ -80,16 +84,15 @@ input { font: inherit; color: inherit; }
 .num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 
 /* ============================ Guscio ==================================== */
-/* Niente unita' di viewport, nemmeno dvh: `dvh` e' dinamico per definizione e
-   su iOS cambia quando Safari riapre la barra degli indirizzi — cosa che fa
-   proprio all'apertura di un modale, perche' la pagina smette di scorrere.
-   Il risultato era un guscio che si accorciava di colpo trascinandosi dietro
-   tutto cio' che vi era ancorato. `position: fixed` + `inset: 0` da' la stessa
-   altezza ma presa dal viewport di layout, che non si muove. */
+/* 100dvh, non 100vh: su iOS il secondo include la chrome del browser e il
+   layout "quasi" entra, cioe' scrolla.
+   Provato a sostituirlo con `position: fixed; inset: 0`, ed e' peggio: sul
+   telefono il guscio si fermava prima del bordo inferiore e sotto la nav bar
+   restava una striscia nera. Li' il viewport di layout non arriva al fondo
+   dello schermo; dvh si'. */
 
 .app {
-  position: fixed;
-  inset: 0;
+  height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding-top: env(safe-area-inset-top);
@@ -267,17 +270,13 @@ input { font: inherit; color: inherit; }
 dialog.sheet {
   width: 100%;
   max-width: 480px;
-  /* Lo stylesheet del browser impone `height: fit-content` e un `max-height`
-     sui dialog. Qui tutti i figli sono in position:absolute, quindi non fanno
-     altezza: lasciando fare alla UA il dialog collassa a 0 e il contenuto
-     ancorato con `bottom: 0` finisce sopra il bordo dello schermo, invisibile.
-     `auto` restituisce l'altezza a `inset: 0`, cioe' al viewport di layout.
-     Qui c'era `100dvh`, ed era la causa del pannello che partiva troppo in
-     alto per poi riassestarsi: all'apertura di un modale la pagina smette di
-     scorrere, Safari riapre la barra degli indirizzi e `dvh` si accorcia. Il
-     pannello, ancorato in basso, seguiva. */
-  height: auto;
-  max-height: none;
+  /* Lo stylesheet del browser impone `height: fit-content` sui dialog. Qui
+     tutti i figli sono in position:absolute, quindi non fanno altezza: senza
+     un'altezza esplicita il dialog collassa a 0 e il contenuto ancorato con
+     `bottom: 0` finisce sopra il bordo dello schermo, invisibile.
+     Stessa ragione del guscio per preferire dvh a `inset: 0`. */
+  height: 100dvh;
+  max-height: 100dvh;
   margin: 0 auto;
   padding: 0;
   border: 0;
@@ -287,17 +286,6 @@ dialog.sheet {
   inset: 0;
 }
 dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
-
-/* Con un modale aperto il guscio dietro smette di ricevere tocchi. Non e'
-   ridondante rispetto al top layer, che gia' dovrebbe stare sopra a tutto:
-   WebKit ogni tanto dipinge gli elementi con `backdrop-filter` sopra di esso,
-   e la tab bar ne ha uno. Da li' le Impostazioni che ogni tanto non
-   rispondevano — ma solo in fondo allo schermo, dove passa la tab bar.
-   Toglierle il blur mentre il modale e' aperto rimuove la causa;
-   `pointer-events: none` fa da rete se il difetto si presenta altrove.
-   Se `:has()` non c'e', la regola cade e resta il comportamento di prima. */
-body:has(dialog[open]) .app { pointer-events: none; }
-body:has(dialog[open]) .tabbar { backdrop-filter: none; }
 
 .sheet-inner {
   position: absolute;
