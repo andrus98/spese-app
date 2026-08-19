@@ -41,7 +41,10 @@
   --ease: cubic-bezier(.32, .72, 0, 1);
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* manipulation: toglie l'attesa del secondo tocco, cioe' lo zoom da doppio
+   tap che partiva martellando i tasti del tastierino. Da solo: il meta
+   viewport non scalabile mandava gli sheet fuori posto in apertura. */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
 html, body {
   margin: 0;
