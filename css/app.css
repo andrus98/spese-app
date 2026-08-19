@@ -41,10 +41,7 @@
   --ease: cubic-bezier(.32, .72, 0, 1);
 }
 
-/* touch-action: manipulation toglie lo zoom da doppio tocco. Serve QUI e non
-   solo nel viewport perche' e' l'unica cosa che elimina anche l'attesa di
-   ~300 ms con cui il browser aspetta il secondo tocco. */
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 html, body {
   margin: 0;
@@ -56,12 +53,6 @@ html, body {
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
-  /* Solo scorrimento: pan-x pan-y esclude la pinch, che `manipulation`
-     lascerebbe passare. Il browser interseca i valori risalendo gli
-     antenati, quindi imporlo qui vale per tutta la pagina. */
-  touch-action: pan-x pan-y;
-  /* Senza questo iOS ingrandisce da solo il testo in landscape. */
-  -webkit-text-size-adjust: 100%;
 }
 
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
@@ -133,12 +124,7 @@ input { font: inherit; color: inherit; }
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-  /* Non tutto l'inset: la barra home dell'iPhone e' una striscia sottile in
-     fondo a un'area di sicurezza generosa, e riservarla per intero lasciava
-     le icone alte con una fascia vuota sotto. Se ne restituisce una parte al
-     contenuto, tenendo comunque libera la striscia. Su un browser senza
-     notch l'inset e' 0 e la max() impedisce un padding negativo. */
-  padding-bottom: max(0px, calc(env(safe-area-inset-bottom) - 10px));
+  padding-bottom: env(safe-area-inset-bottom);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border-top: 1px solid var(--hairline);
   backdrop-filter: blur(20px);

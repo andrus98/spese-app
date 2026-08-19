@@ -15,7 +15,7 @@ import { makeZip } from '../js/zip.js';
 import { buildWorkbook } from '../js/export-xlsx.js';
 import { el } from '../js/ui.js';
 import { createSummaryScreen } from '../js/screen-summary.js';
-import { createSettingsSheet, assetsToRevalidate } from '../js/screen-settings.js';
+import { createSettingsSheet } from '../js/screen-settings.js';
 import { createMovementsScreen } from '../js/screen-movements.js';
 import { createIncomeScreen } from '../js/screen-income.js';
 import { createEntryScreen } from '../js/screen-entry.js';
@@ -1568,46 +1568,6 @@ async function run() {
     assert(response.ok, 'apple-touch-icon mancante');
     const bytes = new Uint8Array(await response.arrayBuffer());
     eq(new DataView(bytes.buffer).getUint32(16), 180);
-  });
-
-  await test('lo zoom è disattivato: è un\'app, non un documento', async () => {
-    // Due gesti diversi, due meccanismi diversi, e servono entrambi: il meta
-    // viewport ferma la pinch (in standalone, l'unico posto in cui Safari lo
-    // rispetta), touch-action ferma il doppio tocco anche in una scheda.
-    const html = await fetch('../index.html').then((r) => r.text());
-    const viewport = html.match(/name="viewport"\s+content="([^"]+)"/)?.[1] ?? '';
-    assert(viewport.includes('user-scalable=no'), 'il viewport permette ancora lo zoom');
-    assert(viewport.includes('viewport-fit=cover'), 'senza cover le safe-area tornano a zero');
-
-    // Misurato, non cercato nel sorgente: quello che conta e' il valore
-    // calcolato dal browser dopo tutta la cascata. Si guarda cosa CONCEDE e
-    // cosa no, non la stringa esatta, che ogni motore serializza a modo suo.
-    await appCssLoaded;
-    const touch = getComputedStyle(document.body).touchAction;
-    assert(touch.includes('pan-x') && touch.includes('pan-y'),
-      `scorrimento bloccato: touch-action = ${touch}`);
-    assert(!/auto|manipulation|pinch-zoom/.test(touch),
-      `zoom ancora concesso: touch-action = ${touch}`);
-  });
-
-  await test('l\'aggiornamento forzato riscarica tutto e solo il nostro', () => {
-    // Il documento c'e' sempre (non compare fra le risorse), i duplicati e i
-    // frammenti spariscono, e quello che non e' nostro resta fuori: le
-    // chiamate a GitHub non vanno in cache da nessuna parte.
-    const urls = assetsToRevalidate([
-      { name: 'https://tizio.github.io/spese/js/app.js' },
-      { name: 'https://tizio.github.io/spese/js/app.js' },
-      { name: 'https://tizio.github.io/spese/css/app.css#x' },
-      { name: 'https://api.github.com/repos/tizio/dati/contents/data' },
-      { name: 'blob:https://tizio.github.io/9f2c' },
-      null,
-    ], 'https://tizio.github.io', 'https://tizio.github.io/spese/#riepilogo');
-
-    eq(urls, [
-      'https://tizio.github.io/spese/',
-      'https://tizio.github.io/spese/js/app.js',
-      'https://tizio.github.io/spese/css/app.css',
-    ]);
   });
 
   await test('il service worker non mette MAI in cache i dati', async () => {
