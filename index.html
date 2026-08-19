@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <!-- viewport-fit=cover: senza, env(safe-area-inset-*) resta a zero e la nav
      bar finisce sotto la barra home dell'iPhone. -->
-<!-- maximum-scale/user-scalable: niente zoom. E' un'app, non una pagina: il
-     doppio tap rapido su un tasto del tastierino deve restare due tocchi. -->
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Niente maximum-scale/user-scalable: alteravano le metriche del visual
+     viewport su iOS e lo sheet si apriva spostato in alto. Lo zoom resta
+     bloccato dal touch-action nel CSS e dai gesture event in app.js. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data:; object-src 'none'; base-uri 'none'">
 <meta name="theme-color" content="#08090C">
