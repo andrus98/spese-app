@@ -1,0 +1,26 @@
+{
+  "name": "PrjSpesa",
+  "short_name": "PrjSpesa",
+  "description": "Tracciamento spese personali, cifrato end-to-end.",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08090C",
+  "theme_color": "#08090C",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Self-test — Spese</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 -apple-system, system-ui, sans-serif; margin: 0; padding: 1.5rem; max-width: 60rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  p.sub { margin: 0 0 1.25rem; opacity: .7; font-size: .875rem; }
+  #summary { font-size: 1.05rem; font-weight: 600; padding: .6rem .9rem; border-radius: .5rem;
+             background: color-mix(in srgb, currentColor 8%, transparent); margin-bottom: 1.5rem; }
+  #summary.ok { color: #0a7d33; }
+  #summary.ko { color: #c22; }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; opacity: .6;
+       margin: 1.5rem 0 .4rem; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: .12rem 0; font-variant-numeric: tabular-nums; }
+  li.ko { color: #c22; font-weight: 600; }
+  .err { margin: .2rem 0 .4rem 1.5rem; padding: .4rem .6rem; font-family: ui-monospace, monospace;
+         font-size: .8rem; background: color-mix(in srgb, #c22 12%, transparent); border-radius: .3rem; }
+</style>
+</head>
+<body>
+  <h1>Self-test</h1>
+  <p class="sub">Senza Node, la verifica gira qui. Funziona da <code>localhost</code>, da GitHub Pages e da iPhone.</p>
+  <div id="summary">esecuzione in corso…</div>
+  <div id="out"></div>
+  <script type="module" src="./selftest.js"></script>
+</body>
+</html>

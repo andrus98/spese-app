@@ -1,0 +1,544 @@
+/* Design system — scuro, fintech. Tipografia di sistema (SF Pro su iPhone,
+   cioè lo stesso font delle app native). Nessun font esterno: il CSP lo
+   vieterebbe, e comunque i font commerciali non sono ridistribuibili. */
+
+:root {
+  color-scheme: dark;
+
+  /* Fondali */
+  --bg: #08090C;
+  --surface: #14161B;
+  --surface-2: #1D2027;
+  --surface-3: #262A33;
+  --hairline: #2C313B;
+
+  /* Testo */
+  --text: #FFFFFF;
+  --text-dim: #939BAA;
+  --text-faint: #5C6474;
+
+  /* Accento */
+  --accent: #3D7BFF;
+  --accent-soft: #1B2C55;
+  --accent-text: #FFFFFF;
+  --violet: #8B5CF6;
+
+  --positive: #2ED573;
+  --negative: #FF4757;
+
+  /* Forma */
+  --r-tile: 20px;
+  --r-card: 18px;
+  --r-key: 16px;
+  --r-pill: 999px;
+
+  --gap: 10px;
+  --pad: 16px;
+
+  --topbar-h: 52px;
+  --tabbar-h: 58px;
+
+  --ease: cubic-bezier(.32, .72, 0, 1);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input { font: inherit; color: inherit; }
+
+/* Numeri sempre tabulari: le cifre non devono ballare mentre si digita. */
+.num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+/* ============================ Guscio ==================================== */
+/* 100dvh, non 100vh: su iOS il secondo include la chrome del browser e il
+   layout "quasi" entra, cioè scrolla. */
+
+.app {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding-top: env(safe-area-inset-top);
+  overflow: hidden;
+}
+
+.topbar {
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--pad);
+}
+
+.brand { display: flex; align-items: center; gap: 9px; }
+.brand-mark {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 9px;
+  /* Il marchio e' quasi nero come lo sfondo della barra: senza un contorno
+     sparirebbe. Il filo blu lo stacca e lo lega all'accento dell'app. */
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.topbar h1 {
+  margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.035em;
+  line-height: 1.05;
+}
+/* La seconda meta del nome prende il gradiente del marchio: lega il titolo
+   all'icona senza aggiungere un'immagine. */
+.topbar h1 .accent {
+  background: linear-gradient(100deg, var(--accent) 0%, #A78BFA 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.topbar .sub { font-size: 11.5px; color: var(--text-dim); font-weight: 600; letter-spacing: .01em; }
+
+.icon-btn {
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  transition: background .15s var(--ease);
+}
+.icon-btn:active { background: var(--surface-3); }
+
+.screen-host { min-height: 0; overflow: hidden; display: grid; }
+.screen { min-height: 0; overflow-y: auto; padding: 4px var(--pad) 0; -webkit-overflow-scrolling: touch; }
+
+/* `hidden` deve battere i display espliciti (.tabbar è grid, .panel è grid). */
+[hidden] { display: none !important; }
+
+/* ============================ Tab bar =================================== */
+
+.tabbar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-top: 1px solid var(--hairline);
+  backdrop-filter: blur(20px);
+}
+
+.tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  font-size: 9.5px; font-weight: 600;
+  color: var(--text-faint);
+  transition: color .15s var(--ease);
+}
+.tab svg { width: 22px; height: 22px; }
+.tab[aria-selected="true"] { color: var(--accent); }
+
+/* ============================ Griglia categorie ========================= */
+
+/* Le tessere restano QUADRATE — la larghezza della colonna decide anche
+   l'altezza — e lo spazio verticale che avanza viene distribuito in bande
+   uguali sopra, sotto e fra le righe. Allungare le tessere per riempire
+   l'altezza le avrebbe rese rettangoli. */
+.cat-grid {
+  display: grid;
+  /* minmax(0, 1fr) e non 1fr: la larghezza minima automatica di una colonna
+     e' quella del contenuto, e una parola lunga come "Manutenzione"
+     allargherebbe la sua colonna trascinando tutte le altre fuori schermo. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--gap);
+  height: 100%;
+  align-content: space-evenly;
+  padding-bottom: var(--pad);
+}
+
+/* Le categorie sono piene di violetto con testo bianco; i Canoni, che non
+   registrano una spesa, sono l'inverso: fondo chiaro e segno colorato. Lo
+   scambio e' il modo piu' rapido per dire "questa tessera fa un'altra cosa",
+   perche' si legge prima ancora di riconoscere l'icona.
+   L'ombra colorata stacca le tessere dal fondo quasi nero: senza, i bordi
+   arrotondati si perdono e la griglia sembra piatta. */
+.cat-tile {
+  aspect-ratio: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 7px;
+  padding: 6px 3px;
+  border-radius: var(--r-tile);
+  /* Due strati: la sfumatura di base piu' una luce radiale in alto a
+     sinistra. Da sola la lineare appiattisce; il riflesso obliquo da' alla
+     tessera un volume che si vede anche a 83 px. */
+  background:
+    radial-gradient(115% 85% at 26% 10%, rgba(255, 255, 255, .34) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(158deg, #6D7CFF 0%, #7B4CF0 100%);
+  border: 1.5px solid rgba(255, 255, 255, .18);
+  color: #FFFFFF;
+  box-shadow:
+    0 7px 18px rgba(105, 66, 232, .42),
+    inset 0 1px 0 rgba(255, 255, 255, .30),
+    inset 0 -8px 14px rgba(48, 20, 120, .30);
+  transition: transform .12s var(--ease), box-shadow .12s var(--ease), background .12s var(--ease);
+}
+.cat-tile:active {
+  transform: scale(.94);
+  background:
+    radial-gradient(115% 85% at 26% 10%, rgba(255, 255, 255, .20) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(158deg, #5A69E8 0%, #6739D6 100%);
+  box-shadow: 0 2px 7px rgba(105, 66, 232, .34), inset 0 -4px 10px rgba(48, 20, 120, .34);
+}
+.cat-tile svg { width: 26px; height: 26px; color: #FFFFFF; }
+
+.cat-tile .label {
+  font-size: 11.5px; font-weight: 800; line-height: 1.12;
+  letter-spacing: -.01em;
+  text-align: center; color: #FFFFFF;
+  /* Le etichette arrivano dai dati e possono essere lunghe: si spezzano con
+     il trattino invece di allargare la tessera. */
+  hyphens: auto; overflow-wrap: anywhere;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+
+.cat-tile.add { background: transparent; border: 1.5px dashed var(--hairline); box-shadow: none; }
+.cat-tile.add svg { color: var(--text-faint); }
+
+/* I canoni non sono una spesa che fai adesso: la tessera lo dice da sola,
+   invertendo il rapporto fra fondo e segno. Etichetta dello stesso colore
+   dell'icona, cosi la tessera resta una cosa sola. */
+.cat-tile.special {
+  /* Su una superficie chiara il volume lo fa l'OMBRA, non la luce: un
+     riflesso bianco su fondo bianco e' invisibile. Qui la sfumatura scende
+     verso il violetto e una velatura radiale scurisce l'angolo in basso a
+     destra, cioe' il lato opposto alla luce delle altre tessere. */
+  background:
+    radial-gradient(105% 80% at 80% 94%, rgba(110, 63, 232, .26) 0%, rgba(110, 63, 232, 0) 62%),
+    linear-gradient(165deg, #FFFFFF 0%, #F4F1FF 46%, #DED4FF 100%);
+  border-color: rgba(123, 76, 240, .5);
+  box-shadow:
+    0 7px 18px rgba(123, 76, 240, .32),
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -9px 16px rgba(110, 63, 232, .22);
+}
+.cat-tile.special:active {
+  background:
+    radial-gradient(105% 80% at 80% 94%, rgba(110, 63, 232, .30) 0%, rgba(110, 63, 232, 0) 62%),
+    linear-gradient(165deg, #EAE4FF 0%, #D2C6FF 100%);
+  box-shadow: 0 2px 7px rgba(123, 76, 240, .28), inset 0 -5px 12px rgba(110, 63, 232, .26);
+}
+.cat-tile.special svg { color: #6E3FE8; }
+.cat-tile.special .label { color: #6E3FE8; }
+
+/* Schermi bassi: si stringe invece di traboccare. */
+@media (max-height: 700px) {
+  :root { --gap: 8px; --r-tile: 17px; }
+  .cat-tile svg { width: 22px; height: 22px; }
+  .cat-tile .label { font-size: 10px; }
+}
+
+/* ============================ Sheet di inserimento ====================== */
+
+dialog.sheet {
+  width: 100%;
+  max-width: 480px;
+  /* Lo stylesheet del browser impone `height: fit-content` sui dialog. Qui
+     tutti i figli sono in position:absolute, quindi non fanno altezza: senza
+     un'altezza esplicita il dialog collassa a 0 e il contenuto ancorato con
+     `bottom: 0` finisce sopra il bordo dello schermo, invisibile. */
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  position: fixed;
+  inset: 0;
+}
+dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
+
+.sheet-inner {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--surface);
+  border-radius: 26px 26px 0 0;
+  padding: 8px var(--pad) calc(12px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 12px;
+  animation: rise .28s var(--ease);
+}
+@keyframes rise { from { transform: translateY(100%); } }
+
+.grabber { width: 36px; height: 4px; border-radius: 2px; background: var(--surface-3); margin: 4px auto 0; }
+
+.sheet-head { display: flex; align-items: center; gap: 10px; }
+.sheet-head .chip {
+  width: 34px; height: 34px; border-radius: 11px;
+  background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center;
+}
+.sheet-head .chip svg { width: 20px; height: 20px; }
+.sheet-head .name { font-size: 15px; font-weight: 700; }
+.sheet-head .close { margin-left: auto; }
+
+/* Display dell'importo */
+.amount {
+  display: flex; align-items: baseline; justify-content: center; gap: 4px;
+  padding: 10px 0 4px;
+  font-size: 44px; font-weight: 700; letter-spacing: -.03em;
+}
+.amount .cur { font-size: 26px; color: var(--text-faint); font-weight: 600; }
+.amount .val { min-width: 1ch; }
+.amount.empty .val { color: var(--text-faint); }
+.amount .caret {
+  width: 2px; height: 38px; background: var(--accent);
+  border-radius: 1px; animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.amount-err { text-align: center; font-size: 12.5px; color: var(--negative); min-height: 16px; font-weight: 500; }
+
+/* Righe a scomparsa */
+.toggle-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: var(--surface-2);
+  font-size: 13.5px; font-weight: 600;
+  width: 100%;
+  text-align: left;
+}
+.toggle-row .val { margin-left: auto; color: var(--text-dim); font-weight: 500; }
+.toggle-row svg { width: 17px; height: 17px; color: var(--text-dim); }
+.toggle-row[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent); }
+.toggle-row[aria-expanded="true"] svg,
+.toggle-row[aria-expanded="true"] .val { color: var(--accent); }
+
+.panel { display: grid; gap: 8px; padding: 2px 0 6px; }
+.panel[hidden] { display: none; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-btn {
+  padding: 7px 11px; border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text-dim);
+  font-size: 13px; font-weight: 600;
+}
+.chip-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+
+.field {
+  width: 100%;
+  padding: 12px 13px;
+  border-radius: 13px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  font-size: 16px; /* mai sotto 16: iOS zooma sul focus */
+}
+.field::placeholder { color: var(--text-faint); }
+.field:focus { outline: none; border-color: var(--accent); }
+
+/* ============================ Tastierino ================================ */
+/* Tastierino nostro, non quello di iOS: il tastierino numerico di sistema non
+   ha il tasto Invio, e la tastiera di sistema coprirebbe il pulsante di
+   conferma. Con il nostro, il tasto di conferma sta sempre dove sta il pollice. */
+
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+.key {
+  height: 52px;
+  border-radius: var(--r-key);
+  background: var(--surface-2);
+  font-size: 23px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: grid; place-items: center;
+  transition: background .1s var(--ease), transform .1s var(--ease);
+  user-select: none;
+}
+.key:active { background: var(--surface-3); transform: scale(.96); }
+.key svg { width: 24px; height: 24px; }
+
+.confirm {
+  height: 52px;
+  border-radius: var(--r-key);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 16px; font-weight: 700;
+  display: grid; place-items: center;
+  transition: opacity .15s var(--ease), transform .1s var(--ease);
+}
+.confirm:active { transform: scale(.98); }
+.confirm:disabled { opacity: .3; }
+.confirm.busy { opacity: .6; }
+
+/* ============================ Setup ===================================== */
+
+.setup { max-width: 460px; margin: 0 auto; padding: 8px 0 32px; display: grid; gap: 18px; }
+.setup h2 { margin: 0; font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
+.setup p { margin: 0; color: var(--text-dim); font-size: 14px; }
+.setup label { display: grid; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-dim); }
+
+.warn {
+  padding: 13px; border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--negative) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--negative) 30%, transparent);
+  font-size: 13px; color: #FFC9CE;
+}
+
+.btn {
+  padding: 15px; border-radius: var(--r-card);
+  background: var(--accent); color: var(--accent-text);
+  font-size: 15.5px; font-weight: 700; width: 100%;
+}
+.btn:disabled { opacity: .35; }
+.btn.ghost { background: var(--surface-2); color: var(--text); }
+
+.status { font-size: 13px; min-height: 18px; }
+.status.ok { color: var(--positive); }
+.status.ko { color: var(--negative); }
+.status.wait { color: var(--text-dim); }
+
+/* ============================ Vari ====================================== */
+
+.empty-state { text-align: center; color: var(--text-faint); padding: 48px 20px; font-size: 14px; }
+
+.toast {
+  position: fixed;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
+  padding: 11px 17px; border-radius: var(--r-pill);
+  background: var(--surface-3); color: var(--text);
+  font-size: 13.5px; font-weight: 600;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .5);
+  animation: toast-in .25s var(--ease);
+  z-index: 10;
+}
+.toast.ko { background: var(--negative); }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ============================ Riepilogo ================================= */
+
+.period { display: flex; align-items: center; justify-content: space-between; padding: 2px 0 12px; }
+.period-label { font-size: 17px; font-weight: 700; letter-spacing: -.01em; text-transform: capitalize; }
+
+.summary-body { display: grid; gap: 10px; padding-bottom: 24px; }
+
+.card { background: var(--surface); border-radius: var(--r-card); padding: 14px; }
+.card-label { font-size: 11.5px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+.card-value { font-size: 22px; font-weight: 700; margin-top: 3px; letter-spacing: -.02em; }
+.card-value.pos { color: var(--positive); }
+.card-value.neg { color: var(--negative); }
+
+.card.hero { background: linear-gradient(140deg, var(--accent) 0%, #6C4BFF 100%); }
+.card.hero .card-label { color: rgba(255, 255, 255, .75); }
+.card.hero .card-value { font-size: 34px; }
+.card-delta { font-size: 12px; font-weight: 600; margin-top: 6px; color: rgba(255, 255, 255, .8); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.kpi-row.three { grid-template-columns: repeat(3, 1fr); }
+.kpi-row.three .card-value { font-size: 15px; }
+.kpi-row.three .card-label { font-size: 10px; }
+
+.block { margin-top: 8px; }
+.block-title { font-size: 11.5px; font-weight: 700; color: var(--text-dim);
+               text-transform: uppercase; letter-spacing: .06em; margin: 0 2px 7px; }
+.block-body { background: var(--surface); border-radius: var(--r-card); padding: 4px 14px; }
+.block-body.stack { display: grid; gap: 12px; padding: 14px; }
+
+.line { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 11px 0; border-bottom: 1px solid var(--hairline); }
+.line:last-child { border-bottom: 0; }
+.line-label { font-size: 14px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line-value { font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.line-value.pos { color: var(--positive); }
+.line-value.neg { color: var(--negative); }
+
+.cat-row { display: flex; align-items: center; gap: 11px; padding: 10px 0;
+           border-bottom: 1px solid var(--hairline); }
+.cat-row:last-child { border-bottom: 0; }
+.cat-ico { width: 32px; height: 32px; flex: none; border-radius: 10px; display: grid; place-items: center;
+           background: var(--surface-2); color: var(--accent); }
+.cat-ico svg { width: 18px; height: 18px; }
+.cat-main { flex: 1; min-width: 0; }
+.cat-top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 600; }
+.bar { display: block; height: 4px; border-radius: 2px; background: var(--surface-3); margin-top: 6px; overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+
+/* ============================ Impostazioni ============================== */
+
+dialog.sheet.full { }
+.sheet-full-inner {
+  position: absolute; inset: 0;
+  background: var(--bg);
+  padding: calc(10px + env(safe-area-inset-top)) var(--pad) calc(20px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px;
+  overflow-y: auto;
+  animation: rise .28s var(--ease);
+}
+.settings-body { display: grid; gap: 14px; }
+
+.hint { margin: 0; font-size: 12.5px; color: var(--text-dim); line-height: 1.45; }
+
+.inline-field { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                font-size: 13.5px; font-weight: 600; color: var(--text-dim); }
+.field.small { width: 42%; padding: 9px 11px; text-align: right; font-size: 16px; }
+select.field { -webkit-appearance: none; appearance: none; }
+
+.recurring-row { border-bottom: 1px solid var(--hairline); padding-bottom: 12px; }
+.recurring-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.recurring-head .icon-btn { width: 30px; height: 30px; }
+.recurring-head .icon-btn svg { width: 16px; height: 16px; }
+.recurring-fields { display: grid; gap: 8px; }
+
+.btn.ghost { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn svg, .btn-ico svg { width: 18px; height: 18px; }
+.btn.ghost.danger { color: var(--negative); }
+
+/* ============================ Movimenti ================================= */
+
+.movements-total { display: flex; justify-content: space-between; align-items: baseline;
+                   font-size: 12.5px; color: var(--text-dim); font-weight: 600; padding: 0 2px 8px; }
+.movements-total .num { font-size: 15px; color: var(--text); }
+
+.movements { display: grid; gap: 6px; }
+
+.mov { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+       padding: 10px 12px; border-radius: 14px; background: var(--surface);
+       transition: background .12s var(--ease); }
+.mov:active { background: var(--surface-2); }
+.mov-main { flex: 1; min-width: 0; display: grid; }
+.mov-title { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-sub { font-size: 11.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-amount { font-size: 15px; font-weight: 700; white-space: nowrap; }
+
+.export-zone { padding: 20px 0 24px; }
+
+/* Barra d'errore: su iPhone non c'è una console, quindi gli errori non
+   gestiti devono comparire a schermo. Si chiude toccandola. */
+.errorbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--negative); color: #fff;
+  font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  word-break: break-word;
+}
+
+/* Azioni che non devono invitare al tocco: larghezza contenuta, allineate a
+   sinistra come una voce di menu, non come un pulsante primario. */
+.btn.compact { width: auto; padding: 11px 18px; font-size: 14px; justify-self: center; }
+
+/* Righe dell'anno, nella schermata Entrate: sono pulsanti, ma devono leggersi
+   come righe di una lista. */
+.line.as-button { width: 100%; text-align: left; }
+.line.as-button:active { background: var(--surface-2); }
+.line.as-button.current .line-label { color: var(--text); font-weight: 700; }
+.line-value.muted { color: var(--text-faint); font-weight: 500; }
+
+.recurring-when { font-size: 11.5px; color: var(--text-dim); font-weight: 500; margin-left: auto; }
+.recurring-head .cat-ico { width: 28px; height: 28px; }
+.recurring-head .cat-ico svg { width: 16px; height: 16px; }
+.recurring-head .icon-btn { margin-left: 10px; }
