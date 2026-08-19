@@ -105,6 +105,14 @@ const tabbar = el('nav', { class: 'tabbar' }, TABS.map((tab) => el('button', {
 const shell = el('div', { class: 'app' }, [topbar, main, tabbar]);
 document.body.replaceChildren(shell);
 
+// Safari ignora `user-scalable=no` in una scheda normale — lo rispetta solo
+// dall'icona in home — ma non ignora la preventDefault sugli eventi `gesture*`,
+// che sono proprietari e nascono solo dalla pinch. Il CSS copre il doppio
+// tocco, questo copre le due dita.
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+}
+
 // --- Schermate ---------------------------------------------------------------
 
 const entry = createEntryScreen(app);
