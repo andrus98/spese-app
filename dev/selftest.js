@@ -18,7 +18,7 @@ import { createSummaryScreen } from '../js/screen-summary.js';
 import { createSettingsSheet } from '../js/screen-settings.js';
 import { createMovementsScreen } from '../js/screen-movements.js';
 import { createIncomeScreen } from '../js/screen-income.js';
-import { createEntryScreen, keyboardOverlap } from '../js/screen-entry.js';
+import { createEntryScreen } from '../js/screen-entry.js';
 
 const results = [];
 let currentSuite = '';
@@ -1458,26 +1458,6 @@ async function run() {
     host.remove();
   });
 
-
-  await test('il pannello si alza SOLO per la tastiera, non a ogni sussulto', () => {
-    // Regressione del rimbalzo: il pannello schizzava in alto per poi
-    // rimettersi a posto. La causa era compensare qualunque restringimento del
-    // visual viewport. Quando un modale blocca lo scorrimento Safari riapre la
-    // barra degli indirizzi e il visual viewport perde ~90px: senza nessuno
-    // che stia scrivendo, quello scarto non va toccato.
-    eq(keyboardOverlap({ typing: false, innerHeight: 844, viewportHeight: 752, offsetTop: 0 }), 0);
-
-    // Con un campo a fuoco invece va compensato tutto: e' la tastiera.
-    eq(keyboardOverlap({ typing: true, innerHeight: 844, viewportHeight: 508, offsetTop: 0 }), 336);
-
-    // Scarto di pochi pixel fra i due viewport: su iOS c'e' sempre, e non
-    // significa niente.
-    eq(keyboardOverlap({ typing: true, innerHeight: 844, viewportHeight: 838, offsetTop: 0 }), 0);
-
-    // Viewport visuale scorso dentro quello di layout: la parte gia' scorsa
-    // non e' coperta dalla tastiera e non va contata due volte.
-    eq(keyboardOverlap({ typing: true, innerHeight: 844, viewportHeight: 508, offsetTop: 100 }), 236);
-  });
 
   // Le misure hanno senso solo con un viewport vero: in un pannello collassato
   // il guscio vale zero e qualunque geometria risulta sbagliata. Un test che

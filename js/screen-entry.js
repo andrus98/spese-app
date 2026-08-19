@@ -17,35 +17,6 @@ const TILE_ORDER = [
   'spotify', 'dazn', 'vodafone',
 ];
 
-/**
- * Di quanto va alzato il pannello perché la tastiera di sistema non copra i
- * campi. Zero quando non si sta scrivendo, ed è tutto il punto.
- *
- * Prima si compensava qualunque restringimento del visual viewport, ma quel
- * valore cambia per un sacco di motivi che con la tastiera non c'entrano: la
- * barra di Safari che si riapre quando un modale blocca lo scorrimento, il
- * rimbalzo dello scorrimento, l'apertura stessa del dialog. Ognuno alzava il
- * pannello di 45-90px. Peggio: l'animazione di risalita sovrascrive lo stile
- * inline finché dura, quindi lo scatto compariva solo alla fine dei 280ms e
- * si riassestava all'evento successivo — il rimbalzo.
- *
- * La tastiera è l'unico caso in cui il pannello DEVE spostarsi, ed è l'unico
- * riconoscibile con certezza: c'è un campo a fuoco dentro il foglio.
- *
- * La soglia dei 20px resta per gli scarti di un paio di pixel fra i due
- * viewport, che su iOS ci sono sempre.
- */
-export function keyboardOverlap({ typing, innerHeight, viewportHeight, offsetTop }) {
-  if (!typing) return 0;
-  const overlap = innerHeight - viewportHeight - offsetTop;
-  return overlap > 20 ? overlap : 0;
-}
-
-const isTyping = (root) => {
-  const active = document.activeElement;
-  return active instanceof HTMLInputElement && root.contains(active);
-};
-
 export function createEntryScreen(app) {
   const grid = el('div', { class: 'cat-grid' });
   const node = el('section', { class: 'screen', id: 'screen-entry' }, [grid]);
@@ -174,13 +145,9 @@ function createSheet(app) {
   // questo, i campi finirebbero sotto la tastiera.
   if (window.visualViewport) {
     const reflow = () => {
-      const shift = dialog.open ? keyboardOverlap({
-        typing: isTyping(dialog),
-        innerHeight: window.innerHeight,
-        viewportHeight: window.visualViewport.height,
-        offsetTop: window.visualViewport.offsetTop,
-      }) : 0;
-      inner.style.transform = shift ? `translateY(${-shift}px)` : '';
+      if (!dialog.open) return;
+      const overlap = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+      inner.style.transform = overlap > 20 ? `translateY(${-overlap}px)` : '';
     };
     window.visualViewport.addEventListener('resize', reflow);
     window.visualViewport.addEventListener('scroll', reflow);

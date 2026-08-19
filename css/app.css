@@ -36,20 +36,7 @@
   --pad: 16px;
 
   --topbar-h: 52px;
-
-  /* Le due manopole della nav bar. `--tabbar-h` e' la fascia che contiene
-     icona e scritta; `--safe-b` e' il vuoto che resta sotto, verso il bordo.
-     Il grigio che avanza sotto le scritte e' la meta' bassa della prima piu'
-     tutta la seconda: per stringere ancora, cala questi due numeri. */
-  --tabbar-h: 52px;
-
-  /* NON tutta l'area di sicurezza. La barra home dell'iPhone e' una striscia
-     sottile che arriva a ~13px dal bordo, ma l'inset che iOS dichiara ne vale
-     34: riservarlo per intero — come fa la tab bar di sistema — lascia sotto
-     le scritte una fascia vuota che su una barra di sole quattro voci pesa.
-     Se ne tengono 12, quanto basta a non finire sotto la striscia. Senza
-     notch l'inset e' 0 e la max() evita un valore negativo. */
-  --safe-b: max(0px, calc(env(safe-area-inset-bottom) - 22px));
+  --tabbar-h: 58px;
 
   --ease: cubic-bezier(.32, .72, 0, 1);
 }
@@ -149,8 +136,8 @@ input { font: inherit; color: inherit; }
 .tabbar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  height: calc(var(--tabbar-h) + var(--safe-b));
-  padding-bottom: var(--safe-b);
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border-top: 1px solid var(--hairline);
   backdrop-filter: blur(20px);
@@ -292,7 +279,7 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3p
   left: 0; right: 0; bottom: 0;
   background: var(--surface);
   border-radius: 26px 26px 0 0;
-  padding: 8px var(--pad) calc(12px + var(--safe-b));
+  padding: 8px var(--pad) calc(12px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; gap: 12px;
   animation: rise .28s var(--ease);
 }
@@ -432,7 +419,7 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3p
 .toast {
   position: fixed;
   left: 50%; transform: translateX(-50%);
-  bottom: calc(var(--tabbar-h) + var(--safe-b) + 14px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
   padding: 11px 17px; border-radius: var(--r-pill);
   background: var(--surface-3); color: var(--text);
   font-size: 13.5px; font-weight: 600;
@@ -501,7 +488,7 @@ dialog.sheet.full { }
 .sheet-full-inner {
   position: absolute; inset: 0;
   background: var(--bg);
-  padding: calc(10px + env(safe-area-inset-top)) var(--pad) calc(20px + var(--safe-b));
+  padding: calc(10px + env(safe-area-inset-top)) var(--pad) calc(20px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; gap: 10px;
   overflow-y: auto;
   animation: rise .28s var(--ease);
@@ -548,7 +535,7 @@ select.field { -webkit-appearance: none; appearance: none; }
    gestiti devono comparire a schermo. Si chiude toccandola. */
 .errorbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
-  padding: 12px 16px calc(12px + var(--safe-b));
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   background: var(--negative); color: #fff;
   font-size: 12.5px; font-weight: 600; line-height: 1.35;
   word-break: break-word;
