@@ -207,15 +207,6 @@ function surfaceError(prefix, error) {
 window.addEventListener('error', (event) => surfaceError('Errore', event.error ?? event.message));
 window.addEventListener('unhandledrejection', (event) => surfaceError('Errore', event.reason));
 
-// --- Zoom -------------------------------------------------------------------
-// Safari su iOS ignora user-scalable=no: il pinch va fermato a mano.
-// Il doppio tap lo copre gia' touch-action: manipulation nel CSS; qui non si
-// tocca il touchend, perche' annullarlo ucciderebbe il click del secondo
-// tocco, cioe' proprio le pressioni rapide sul tastierino.
-for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
-  document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
-}
-
 // --- Service worker ---------------------------------------------------------
 // La versione finisce nella query: cambiandola cambia l'URL del worker, quindi
 // il browser si accorge dell'aggiornamento senza affidarsi alla sua euristica.

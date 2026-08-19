@@ -145,13 +145,7 @@ function createSheet(app) {
   // questo, i campi finirebbero sotto la tastiera.
   if (window.visualViewport) {
     const reflow = () => {
-      // Solo con un campo di testo a fuoco: la differenza fra innerHeight e
-      // visual viewport non è zero anche senza tastiera (barra degli indirizzi
-      // che si ritrae, rimbalzi allo scroll), e alzare il pannello in quei
-      // casi fa partire l'apertura da troppo in alto per poi ricadere giù.
-      const typing = inner.contains(document.activeElement)
-        && document.activeElement?.tagName === 'INPUT';
-      if (!dialog.open || !typing) { inner.style.transform = ''; return; }
+      if (!dialog.open) return;
       const overlap = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
       inner.style.transform = overlap > 20 ? `translateY(${-overlap}px)` : '';
     };

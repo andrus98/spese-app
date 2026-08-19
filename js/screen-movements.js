@@ -169,11 +169,7 @@ function createEditor(app, onChanged) {
 
   if (window.visualViewport) {
     const reflow = () => {
-      // Vedi screen-entry.js: si alza solo mentre si digita, altrimenti
-      // l'apertura parte spostata in alto e poi ricade.
-      const typing = inner.contains(document.activeElement)
-        && document.activeElement?.tagName === 'INPUT';
-      if (!dialog.open || !typing) { inner.style.transform = ''; return; }
+      if (!dialog.open) return;
       const overlap = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
       inner.style.transform = overlap > 20 ? `translateY(${-overlap}px)` : '';
     };

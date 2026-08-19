@@ -1,6 +1,6 @@
 // Costanti dell'applicazione. Nessun segreto: questo file sta in un repo pubblico.
 
-export const APP_VERSION = '0.3.7';
+export const APP_VERSION = '0.3.4';
 
 // --- Crittografia -----------------------------------------------------------
 
