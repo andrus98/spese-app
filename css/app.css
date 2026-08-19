@@ -41,7 +41,9 @@
   --ease: cubic-bezier(.32, .72, 0, 1);
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* manipulation: toglie l'attesa del doppio tap, quindi anche lo zoom che
+   partiva martellando i tasti del tastierino. */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
 html, body {
   margin: 0;
@@ -53,6 +55,8 @@ html, body {
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  /* pan-y: resta lo scorrimento verticale, sparisce il pinch. */
+  touch-action: pan-y;
 }
 
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
