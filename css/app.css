@@ -71,12 +71,19 @@ input { font: inherit; color: inherit; }
 .app {
   height: 100dvh;
   display: grid;
-  /* La seconda riga è la barra di stato: nascosta è display:none, quindi la
-     riga `auto` collassa a zero e il layout resta quello di sempre. */
-  grid-template-rows: auto auto 1fr auto;
+  /* Tre righe, tre figli: intestazione, schermata, tab bar. La barra di stato
+     NON è un figlio di .app — vive dentro .topgroup. Se fosse qui servirebbe
+     una quarta riga, e da nascosta (display:none) smetterebbe di essere un
+     grid item: non collasserebbe la propria riga, la libererebbe, facendo
+     scalare indietro main e tab bar di una posizione ciascuno. */
+  grid-template-rows: auto 1fr auto;
   padding-top: env(safe-area-inset-top);
   overflow: hidden;
 }
+
+/* Intestazione: barra del titolo + eventuale barra di stato. Esiste solo per
+   tenere la seconda fuori dalla griglia del guscio (vedi sopra). */
+.topgroup { display: block; }
 
 /* Barra di stato: senza rete, o con spese ancora da sincronizzare. Usare
    l'app offline è raro, quindi non c'è l'abitudine di controllare: il segnale
@@ -170,6 +177,10 @@ input { font: inherit; color: inherit; }
 /* ============================ Coda offline ============================== */
 
 .queue { padding: 18px 0 24px; display: grid; gap: 6px; }
+/* A coda vuota deve occupare ZERO: il contenitore è sempre nel DOM, e i suoi
+   42px di padding facevano scrollare una griglia dimensionata per entrare
+   esatta nello schermo (F4.18). */
+.queue:empty { padding: 0; }
 .queue-title {
   font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-faint);

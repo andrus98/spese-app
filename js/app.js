@@ -144,7 +144,14 @@ const tabbar = el('nav', { class: 'tabbar' }, TABS.map((tab) => el('button', {
   el('span', { text: tab.label }),
 ])));
 
-const shell = el('div', { class: 'app' }, [topbar, statusbar, main, tabbar]);
+// La barra di stato sta DENTRO l'intestazione, non fra i figli di .app.
+// Come figlia diretta aggiungeva una quarta riga alla griglia del guscio, e
+// da nascosta (`display: none`) non è un grid item: non collassa la sua riga,
+// libera la cella e fa scalare indietro tutti gli altri. Risultato, nel caso
+// normale: main finiva sulla riga `auto` e la tab bar su quella `1fr`,
+// prendendosi tutto lo schermo.
+const header = el('div', { class: 'topgroup' }, [topbar, statusbar]);
+const shell = el('div', { class: 'app' }, [header, main, tabbar]);
 document.body.replaceChildren(shell);
 
 // --- Schermate ---------------------------------------------------------------

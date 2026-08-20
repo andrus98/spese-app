@@ -1,9 +1,11 @@
 // Costanti dell'applicazione. Nessun segreto: questo file sta in un repo pubblico.
 
 // 0.4.0: inserimento offline con coda e sincronizzazione differita.
+// 0.4.1: corregge la griglia del guscio, che la 0.4.0 rompeva quando la barra
+//        di stato era nascosta — cioè nell'uso normale.
 // Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
 // senza di lui il codice nuovo non arriverebbe sul dispositivo.
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.4.1';
 
 // --- Crittografia -----------------------------------------------------------
 
