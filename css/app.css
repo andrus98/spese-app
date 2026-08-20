@@ -231,8 +231,10 @@ input { font: inherit; color: inherit; }
    I Canoni, che non registrano una spesa, sono l'inverso: fondo bianco e
    segno colorato. Lo scambio e' il modo piu' rapido per dire "questa tessera
    fa un'altra cosa", perche' si legge prima ancora di riconoscere l'icona.
-   L'ombra colorata stacca le tessere dal fondo quasi nero: senza, i bordi
-   arrotondati si perdono e la griglia sembra piatta. */
+   Le tessere di spesa non hanno ombra: sul fondo quasi nero il colore pieno
+   basta gia' a staccarle, e diciannove aloni uno accanto all'altro sporcano
+   la griglia invece di darle profondita'. L'ombra resta solo sui Canoni,
+   dove serve a dare volume a una tessera chiara. */
 .cat-tile {
   aspect-ratio: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -247,10 +249,7 @@ input { font: inherit; color: inherit; }
     linear-gradient(140deg, var(--accent) 0%, #6C4BFF 100%);
   border: 1.5px solid rgba(255, 255, 255, .18);
   color: #FFFFFF;
-  box-shadow:
-    0 7px 18px rgba(84, 99, 255, .42),
-    inset 0 1px 0 rgba(255, 255, 255, .30),
-    inset 0 -8px 14px rgba(24, 38, 110, .30);
+  box-shadow: none;
   transition: transform .12s var(--ease), box-shadow .12s var(--ease), background .12s var(--ease);
 }
 .cat-tile:active {
@@ -258,7 +257,6 @@ input { font: inherit; color: inherit; }
   background:
     radial-gradient(115% 85% at 26% 10%, rgba(255, 255, 255, .20) 0%, rgba(255, 255, 255, 0) 58%),
     linear-gradient(140deg, #346ADB 0%, #5D41DB 100%);
-  box-shadow: 0 2px 7px rgba(84, 99, 255, .34), inset 0 -4px 10px rgba(24, 38, 110, .34);
 }
 .cat-tile svg { width: 26px; height: 26px; color: #FFFFFF; }
 
@@ -326,12 +324,19 @@ dialog.sheet {
   color: var(--text);
   position: fixed;
   inset: 0;
-  /* Il dialog non deve MAI diventare un contenitore che scorre. Lo
-     stylesheet del browser gli mette `overflow: auto`: durante l'animazione
-     di salita il contenuto sta ancora un'altezza più in basso, showModal()
-     dà il fuoco al pulsante di chiusura, e il browser scorre per portarcelo.
-     A fine animazione il foglio resta spostato in alto di quello scorrimento. */
-  overflow: hidden;
+  /* `clip`, non `hidden`. Lo stylesheet del browser mette `overflow: auto` sul
+     dialog. All'apertura showModal() dà il fuoco al pulsante di chiusura, che
+     in quel momento è ancora un'altezza di foglio più in basso — l'animazione
+     di salita parte da `translateY(100%)` — e il browser SCORRE il dialog per
+     portarcelo: misurati 469px. Il foglio resta lassù per tutta l'animazione e
+     scende di colpo solo quando lo scorrimento viene ricalcolato: è il "sale
+     troppo e poi torna giù".
+     `hidden` non basta: nasconde la barra e vieta lo scorrimento all'utente,
+     ma la scatola resta scorrevole da codice, e portare un elemento nel
+     visibile è codice. `clip` invece non crea proprio un contenitore di
+     scorrimento, quindi non c'è niente da scorrere. Misurato: `auto` 469px,
+     `hidden` 469px, `clip` 0. */
+  overflow: clip;
 }
 dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
 

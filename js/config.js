@@ -8,9 +8,16 @@
 //        cresceva verso l'alto oltre il bordo dello schermo — è ancorato in
 //        basso — portandosi fuori intestazione, importo e pulsante di chiusura.
 //        Insieme, il ricolore delle tessere sull'accento dell'app.
+// 0.4.4: ritirata. Diceva di aver corretto la salita del foglio e non era
+//        vero; il numero però è già arrivato sui dispositivi, quindi non si
+//        riusa — la cache si chiama come la versione.
+// 0.4.5: il foglio non sale più oltre il segno in apertura. Il dialog passa da
+//        `overflow: hidden` a `clip`: `hidden` lascia la scatola scorrevole da
+//        codice, e showModal() la scorreva per raggiungere il pulsante di
+//        chiusura. Insieme, le tessere di spesa perdono l'ombra.
 // Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
 // senza di lui il codice nuovo non arriverebbe sul dispositivo.
-export const APP_VERSION = '0.4.3';
+export const APP_VERSION = '0.4.5';
 
 // --- Crittografia -----------------------------------------------------------
 
