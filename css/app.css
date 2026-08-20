@@ -224,10 +224,13 @@ input { font: inherit; color: inherit; }
   padding-bottom: var(--pad);
 }
 
-/* Le categorie sono piene di violetto con testo bianco; i Canoni, che non
-   registrano una spesa, sono l'inverso: fondo chiaro e segno colorato. Lo
-   scambio e' il modo piu' rapido per dire "questa tessera fa un'altra cosa",
-   perche' si legge prima ancora di riconoscere l'icona.
+/* Le categorie sono piene con la STESSA sfumatura del riquadro "Entrate del
+   mese" (.card.hero): la tessera che registra una spesa e il box che mostra
+   quanto entra sono le due facce dello stesso conto, e ripetere il colore e'
+   il modo piu' economico per dirlo. Se cambia una, cambia l'altra.
+   I Canoni, che non registrano una spesa, sono l'inverso: fondo bianco e
+   segno colorato. Lo scambio e' il modo piu' rapido per dire "questa tessera
+   fa un'altra cosa", perche' si legge prima ancora di riconoscere l'icona.
    L'ombra colorata stacca le tessere dal fondo quasi nero: senza, i bordi
    arrotondati si perdono e la griglia sembra piatta. */
 .cat-tile {
@@ -241,21 +244,21 @@ input { font: inherit; color: inherit; }
      tessera un volume che si vede anche a 83 px. */
   background:
     radial-gradient(115% 85% at 26% 10%, rgba(255, 255, 255, .34) 0%, rgba(255, 255, 255, 0) 58%),
-    linear-gradient(158deg, #6D7CFF 0%, #7B4CF0 100%);
+    linear-gradient(140deg, var(--accent) 0%, #6C4BFF 100%);
   border: 1.5px solid rgba(255, 255, 255, .18);
   color: #FFFFFF;
   box-shadow:
-    0 7px 18px rgba(105, 66, 232, .42),
+    0 7px 18px rgba(84, 99, 255, .42),
     inset 0 1px 0 rgba(255, 255, 255, .30),
-    inset 0 -8px 14px rgba(48, 20, 120, .30);
+    inset 0 -8px 14px rgba(24, 38, 110, .30);
   transition: transform .12s var(--ease), box-shadow .12s var(--ease), background .12s var(--ease);
 }
 .cat-tile:active {
   transform: scale(.94);
   background:
     radial-gradient(115% 85% at 26% 10%, rgba(255, 255, 255, .20) 0%, rgba(255, 255, 255, 0) 58%),
-    linear-gradient(158deg, #5A69E8 0%, #6739D6 100%);
-  box-shadow: 0 2px 7px rgba(105, 66, 232, .34), inset 0 -4px 10px rgba(48, 20, 120, .34);
+    linear-gradient(140deg, #346ADB 0%, #5D41DB 100%);
+  box-shadow: 0 2px 7px rgba(84, 99, 255, .34), inset 0 -4px 10px rgba(24, 38, 110, .34);
 }
 .cat-tile svg { width: 26px; height: 26px; color: #FFFFFF; }
 
@@ -276,27 +279,27 @@ input { font: inherit; color: inherit; }
    invertendo il rapporto fra fondo e segno. Etichetta dello stesso colore
    dell'icona, cosi la tessera resta una cosa sola. */
 .cat-tile.special {
-  /* Su una superficie chiara il volume lo fa l'OMBRA, non la luce: un
-     riflesso bianco su fondo bianco e' invisibile. Qui la sfumatura scende
-     verso il violetto e una velatura radiale scurisce l'angolo in basso a
-     destra, cioe' il lato opposto alla luce delle altre tessere. */
-  background:
-    radial-gradient(105% 80% at 80% 94%, rgba(110, 63, 232, .26) 0%, rgba(110, 63, 232, 0) 62%),
-    linear-gradient(165deg, #FFFFFF 0%, #F4F1FF 46%, #DED4FF 100%);
-  border-color: rgba(123, 76, 240, .5);
+  /* Il fondo resta bianco anche premuto: e' l'unica tessera chiara della
+     griglia, e cambiarne il colore al tocco le toglierebbe proprio il segno
+     che la distingue. Su una superficie chiara il volume lo fa quindi
+     l'OMBRA e non la luce — un riflesso bianco su fondo bianco e'
+     invisibile: la velatura interna in basso a destra e' il lato opposto
+     alla luce delle altre tessere, ed e' blu come il loro riempimento. */
+  background: #FFFFFF;
+  border-color: rgba(61, 123, 255, .5);
   box-shadow:
-    0 7px 18px rgba(123, 76, 240, .32),
+    0 7px 18px rgba(61, 123, 255, .32),
     inset 0 1px 0 rgba(255, 255, 255, 1),
-    inset 0 -9px 16px rgba(110, 63, 232, .22);
+    inset 0 -9px 16px rgba(61, 123, 255, .22);
 }
 .cat-tile.special:active {
-  background:
-    radial-gradient(105% 80% at 80% 94%, rgba(110, 63, 232, .30) 0%, rgba(110, 63, 232, 0) 62%),
-    linear-gradient(165deg, #EAE4FF 0%, #D2C6FF 100%);
-  box-shadow: 0 2px 7px rgba(123, 76, 240, .28), inset 0 -5px 12px rgba(110, 63, 232, .26);
+  background: #FFFFFF;
+  /* Premuta: resta bianca, si abbassa. Lo scatto lo danno la scala di
+     .cat-tile:active e l'ombra che si accorcia. */
+  box-shadow: 0 2px 7px rgba(61, 123, 255, .28), inset 0 -5px 12px rgba(61, 123, 255, .30);
 }
-.cat-tile.special svg { color: #6E3FE8; }
-.cat-tile.special .label { color: #6E3FE8; }
+.cat-tile.special svg { color: var(--accent); }
+.cat-tile.special .label { color: var(--accent); }
 
 /* Schermi bassi: si stringe invece di traboccare. */
 @media (max-height: 700px) {
@@ -323,12 +326,29 @@ dialog.sheet {
   color: var(--text);
   position: fixed;
   inset: 0;
+  /* Il dialog non deve MAI diventare un contenitore che scorre. Lo
+     stylesheet del browser gli mette `overflow: auto`: durante l'animazione
+     di salita il contenuto sta ancora un'altezza più in basso, showModal()
+     dà il fuoco al pulsante di chiusura, e il browser scorre per portarcelo.
+     A fine animazione il foglio resta spostato in alto di quello scorrimento. */
+  overflow: hidden;
 }
 dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
 
 .sheet-inner {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
+  left: 0; right: 0;
+  /* --kb: quanto schermo si prende la tastiera di sistema, misurato sul
+     visualViewport dai due sheet. Il foglio si alza E perde altezza: alzarlo
+     e basta (com'era, con un translate) lo faceva uscire dal bordo opposto. */
+  bottom: var(--kb, 0px);
+  /* Tetto obbligatorio. Il foglio è ancorato in basso, quindi senza un limite
+     cresce verso l'ALTO: con il tastierino, i quattro campi e Elimina (il
+     foglio dei movimenti) sfonda il bordo superiore e intestazione, importo e
+     pulsante di chiusura finiscono fuori schermo, irraggiungibili — il
+     contenuto uscito dal lato alto non è raggiungibile scorrendo. È la causa
+     numero uno dei layout che "quasi" entrano (F4.3). */
+  max-height: calc(100% - var(--kb, 0px));
   background: var(--surface);
   border-radius: 26px 26px 0 0;
   padding: 8px var(--pad) calc(12px + env(safe-area-inset-bottom));
@@ -336,6 +356,18 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3p
   animation: rise .28s var(--ease);
 }
 @keyframes rise { from { transform: translateY(100%); } }
+
+/* La parte che cede quando il foglio non entra: scorre solo quello che sta in
+   mezzo, così intestazione e tastierino restano dove sono — il tasto di
+   conferma non si va a cercare scorrendo (F4.13).
+   `min-height: 0` non è ornamentale: senza, un figlio flex non scende mai
+   sotto l'altezza del proprio contenuto e il tetto qui sopra non servirebbe. */
+.sheet-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 12px;
+}
 
 .grabber { width: 36px; height: 4px; border-radius: 2px; background: var(--surface-3); margin: 4px auto 0; }
 
@@ -365,6 +397,21 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3p
 @keyframes blink { 50% { opacity: 0; } }
 
 .amount-err { text-align: center; font-size: 12.5px; color: var(--negative); min-height: 16px; font-weight: 500; }
+
+/* Schermi bassi: il foglio si stringe PRIMA di mettersi a scorrere, che è la
+   stessa regola della griglia delle categorie (F4.7). Lo scorrimento di
+   `.sheet-scroll` è la rete di sicurezza, non il funzionamento normale.
+   Soglia 840: sotto ci finiscono l'SE (667) e i 812, dove il foglio dei
+   movimenti — 834px a pieno formato — non entrerebbe. */
+@media (max-height: 840px) {
+  .sheet-inner, .sheet-scroll { gap: 8px; }
+  .sheet-inner .amount { font-size: 34px; padding: 4px 0 2px; }
+  .sheet-inner .amount .cur { font-size: 21px; }
+  .sheet-inner .amount .caret { height: 30px; }
+  .sheet-inner .key, .sheet-inner .confirm { height: 46px; }
+  .sheet-inner .field { padding: 9px 13px; }
+  .sheet-inner .btn { padding: 12px; }
+}
 
 /* Righe a scomparsa */
 .toggle-row {

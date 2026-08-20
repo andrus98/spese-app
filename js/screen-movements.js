@@ -155,9 +155,14 @@ function createEditor(app, onChanged) {
         html: uiIcon('close'), onclick: () => dialog.close(),
       }),
     ]),
-    amountBox,
-    errorLine,
-    el('div', { class: 'panel' }, [catSelect, monthSelect, detailField, noteField]),
+    // Qui dentro sta tutto ciò che può cedere se il foglio non entra nello
+    // schermo. Tastierino, Salva ed Elimina restano fuori: non devono
+    // spostarsi mai (F4.13).
+    el('div', { class: 'sheet-scroll' }, [
+      amountBox,
+      errorLine,
+      el('div', { class: 'panel' }, [catSelect, monthSelect, detailField, noteField]),
+    ]),
     keypad.node,
     deleteBtn,
   ]);
@@ -167,11 +172,14 @@ function createEditor(app, onChanged) {
     if (event.target === dialog) dialog.close();
   });
 
+  // Quanto schermo si prende la tastiera di sistema (serve solo per dettaglio
+  // e nota). Il CSS lo usa per alzare il foglio E per togliergli altezza:
+  // alzarlo e basta lo faceva uscire dal bordo superiore.
   if (window.visualViewport) {
     const reflow = () => {
       if (!dialog.open) return;
       const overlap = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
-      inner.style.transform = overlap > 20 ? `translateY(${-overlap}px)` : '';
+      inner.style.setProperty('--kb', overlap > 20 ? `${Math.round(overlap)}px` : '0px');
     };
     window.visualViewport.addEventListener('resize', reflow);
     window.visualViewport.addEventListener('scroll', reflow);
@@ -196,7 +204,7 @@ function createEditor(app, onChanged) {
     detailField.value = tx.detail ?? '';
     noteField.value = tx.note ?? '';
     errorLine.textContent = '';
-    inner.style.transform = '';
+    inner.style.setProperty('--kb', '0px');
 
     // Precarica l'importo esistente: si corregge quasi sempre quello.
     keypad.set(tx.amount);

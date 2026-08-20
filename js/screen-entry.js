@@ -176,10 +176,15 @@ function createSheet(app) {
         html: uiIcon('close'), onclick: () => close(),
       }),
     ]),
-    amountBox,
-    amountError,
-    monthToggle, monthPanel,
-    noteToggle, notePanel,
+    // Qui dentro sta tutto ciò che può cedere se il foglio non entra nello
+    // schermo — con i due pannelli aperti succede già su un SE. Il tastierino
+    // resta fuori: non deve spostarsi mai (F4.13).
+    el('div', { class: 'sheet-scroll' }, [
+      amountBox,
+      amountError,
+      monthToggle, monthPanel,
+      noteToggle, notePanel,
+    ]),
     keypad.node,
   ]);
   dialog.append(inner);
@@ -194,12 +199,14 @@ function createSheet(app) {
 
   // Su iOS la tastiera di sistema (serve solo per dettaglio e nota) restringe
   // il visual viewport senza che gli elementi fixed se ne accorgano: senza
-  // questo, i campi finirebbero sotto la tastiera.
+  // questo, i campi finirebbero sotto la tastiera. Il CSS usa --kb per alzare
+  // il foglio E per togliergli altezza: alzarlo e basta, com'era prima con un
+  // translate, lo faceva uscire dal bordo superiore.
   if (window.visualViewport) {
     const reflow = () => {
       if (!dialog.open) return;
       const overlap = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
-      inner.style.transform = overlap > 20 ? `translateY(${-overlap}px)` : '';
+      inner.style.setProperty('--kb', overlap > 20 ? `${Math.round(overlap)}px` : '0px');
     };
     window.visualViewport.addEventListener('resize', reflow);
     window.visualViewport.addEventListener('scroll', reflow);
@@ -252,7 +259,7 @@ function createSheet(app) {
     noteToggle.setAttribute('aria-expanded', 'false');
     monthPanel.hidden = true;
     notePanel.hidden = true;
-    inner.style.transform = '';
+    inner.style.setProperty('--kb', '0px');
 
     setMonth(currentMonth());
 

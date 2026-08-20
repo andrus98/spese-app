@@ -4,9 +4,13 @@
 // 0.4.1: corregge la griglia del guscio, che la 0.4.0 rompeva quando la barra
 //        di stato era nascosta — cioè nell'uso normale.
 // 0.4.2: investimenti dell'anno nel riepilogo, sotto il risparmio.
+// 0.4.3: il foglio non ha più un'altezza illimitata. Quello dei movimenti
+//        cresceva verso l'alto oltre il bordo dello schermo — è ancorato in
+//        basso — portandosi fuori intestazione, importo e pulsante di chiusura.
+//        Insieme, il ricolore delle tessere sull'accento dell'app.
 // Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
 // senza di lui il codice nuovo non arriverebbe sul dispositivo.
-export const APP_VERSION = '0.4.2';
+export const APP_VERSION = '0.4.3';
 
 // --- Crittografia -----------------------------------------------------------
 
