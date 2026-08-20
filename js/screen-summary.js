@@ -2,7 +2,7 @@
 
 import { el, clear, formatEur } from './ui.js';
 import { uiIcon, categoryIcon } from './icons.js';
-import { summarize, previousMonth, categoryMonth } from './kpi.js';
+import { summarize, previousMonth, categoryMonth, categoryYear } from './kpi.js';
 import { MONTH_NAMES_IT, currentMonth, monthLabel, yearOf } from './model.js';
 
 const pct = (value) => `${(value * 100).toFixed(1).replace('.', ',')} %`;
@@ -85,10 +85,15 @@ export function createSummaryScreen(app) {
     ]));
 
     // --- Anno ---
+    // Gli investimenti dell'anno stanno sotto il risparmio e si leggono allo
+    // stesso modo: sono la quota di spesa che resta tua, quindi segno + e verde
+    // anche se nel totale spese figurano come uscita.
+    const investimentiAnno = categoryYear(app.store.transactions, app.store.meta, 'investimenti', k.year);
     body.append(section('Anno ' + k.year, [
       line('Spese', formatEur(k.speseAnno)),
       line('Entrate', formatEur(k.entrateAnno)),
       line('Risparmio', formatEur(k.risparmioAnno), k.risparmioAnno >= 0 ? 'pos' : 'neg'),
+      line('Investimenti', signed(investimentiAnno), investimentiAnno > 0 ? 'pos' : ''),
     ]));
 
     // --- Dove vanno i soldi ---
@@ -133,6 +138,10 @@ const card = (label, value, tone = '') => el('div', { class: 'card' }, [
   el('div', { class: 'card-label', text: label }),
   el('div', { class: `card-value num ${tone}`.trim(), text: value }),
 ]);
+
+// Il + si mette solo se c'è qualcosa: "+0,00 €" suggerirebbe un versamento
+// che non è mai avvenuto.
+const signed = (value) => (value > 0 ? `+${formatEur(value)}` : formatEur(value));
 
 const section = (title, rows) => el('div', { class: 'block' }, [
   el('div', { class: 'block-title', text: title }),
