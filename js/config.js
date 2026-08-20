@@ -1,6 +1,9 @@
 // Costanti dell'applicazione. Nessun segreto: questo file sta in un repo pubblico.
 
-export const APP_VERSION = '0.3.8';
+// 0.4.0: inserimento offline con coda e sincronizzazione differita.
+// Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
+// senza di lui il codice nuovo non arriverebbe sul dispositivo.
+export const APP_VERSION = '0.4.0';
 
 // --- Crittografia -----------------------------------------------------------
 
@@ -33,9 +36,13 @@ export const LS_REPO = 'spese.repo';   // "owner/repo"
 export const LS_TOKEN = 'spese.token';
 
 export const IDB_NAME = 'spese';
-export const IDB_VERSION = 1;
+// v2: aggiunge lo store `outbox` (coda offline). Gli store si creano tutti in
+// un punto solo — vedi il commento in testa a idb.js, dove sta il motivo per
+// cui non possono nascere ciascuno nel proprio modulo.
+export const IDB_VERSION = 2;
 export const IDB_STORE = 'keys';
 export const IDB_KEY_ID = 'aesKey';
+export const IDB_STORE_OUTBOX = 'outbox';
 
 // --- Schema -----------------------------------------------------------------
 

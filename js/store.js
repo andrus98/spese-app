@@ -16,6 +16,18 @@ import { metaPath, monthPath, yearDir, DATA_ROOT, SEED_CATEGORIES } from './conf
 const MAX_WRITE_ATTEMPTS = 3;
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
+/**
+ * Inserisce una transazione solo se quell'id non c'è già.
+ *
+ * Rende la scrittura idempotente, che è ciò che permette di riprovare una voce
+ * della coda offline senza rischi. Il caso non è teorico e non richiede due
+ * dispositivi: la PUT arriva a GitHub e la risposta si perde: la voce resta in
+ * coda e al tentativo successivo verrebbe scritta due volte, con lo STESSO id.
+ */
+const pushOnce = (file, tx) => {
+  if (!file.transactions.some((t) => t.id === tx.id)) file.transactions.push(tx);
+};
+
 export class Store {
   #years = null;
 
@@ -82,8 +94,14 @@ export class Store {
     return sortTransactions(dedupeById(all));
   }
 
+  /**
+   * Deduplica come il getter `transactions`: un replay della coda offline può
+   * riscrivere una transazione già presente (PUT arrivata, risposta persa), e
+   * questa è la lista che alimenta i Movimenti e il totale del mese. Senza
+   * dedupe il doppione si vedrebbe e raddoppierebbe il totale.
+   */
   transactionsOf(month) {
-    return sortTransactions(this.months.get(month)?.file.transactions ?? []);
+    return sortTransactions(dedupeById(this.months.get(month)?.file.transactions ?? []));
   }
 
   find(id) {
@@ -204,9 +222,49 @@ export class Store {
     this.#assertWritable();
     const tx = makeTransaction(input);
     this.#assertYearLoaded(tx.month);
-    await this.#writeMonth(tx.month, (file) => { file.transactions.push(tx); });
-    await this.#rememberNote(tx.note);
+    await this.#writeMonth(tx.month, (file) => { pushOnce(file, tx); });
+    await this.#rememberNotes([tx.note]);
     return tx;
+  }
+
+  /**
+   * Inserimento in blocco, usato dal flush della coda offline.
+   *
+   * Raggruppa per mese e scrive UNA volta per mese, invece di una volta per
+   * transazione: otto spese inserite senza rete diventano un commit, non otto.
+   * `github.js` serializza già le PUT, ma il limite secondario di GitHub sulle
+   * scritture è un rischio reale (F2.12), e ogni PUT è comunque un commit.
+   *
+   * Anche i suggerimenti nota si scrivono una volta sola alla fine: altrimenti
+   * ogni transazione porterebbe con sé una SECONDA scrittura su meta.json.
+   *
+   * Se la scrittura di un mese fallisce, i mesi già scritti restano scritti e
+   * l'errore si propaga. Il chiamante non deve svuotare la coda: al tentativo
+   * successivo i mesi già andati a buon fine si riscrivono senza duplicare,
+   * perché `pushOnce` ignora gli id già presenti.
+   *
+   * @param {object[]} inputs transazioni da validare e scrivere
+   * @returns {Promise<object[]>} le transazioni validate
+   */
+  async addTransactions(inputs) {
+    this.#assertWritable();
+    const txs = inputs.map((input) => makeTransaction(input));
+
+    const byMonth = new Map();
+    for (const tx of txs) {
+      this.#assertYearLoaded(tx.month);
+      if (!byMonth.has(tx.month)) byMonth.set(tx.month, []);
+      byMonth.get(tx.month).push(tx);
+    }
+
+    for (const [month, group] of [...byMonth].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      await this.#writeMonth(month, (file) => {
+        for (const tx of group) pushOnce(file, tx);
+      });
+    }
+
+    await this.#rememberNotes(txs.map((tx) => tx.note));
+    return txs;
   }
 
   /**
@@ -243,7 +301,7 @@ export class Store {
       });
     }
 
-    await this.#rememberNote(updated.note);
+    await this.#rememberNotes([updated.note]);
     return updated;
   }
 
@@ -267,20 +325,25 @@ export class Store {
   }
 
   /**
-   * Aggiunge la nota ai suggerimenti (D4). È una SECONDA scrittura, con il suo
+   * Aggiunge le note ai suggerimenti (D4). È una SECONDA scrittura, con il suo
    * sha e il suo conflitto: se fallisce non deve far fallire l'inserimento
-   * della spesa, che è già andato a buon fine.
+   * delle spese, che è già andato a buon fine.
+   *
+   * Accetta una lista perché il flush della coda ne ha molte in una volta: una
+   * scrittura sola invece di una per transazione.
    */
-  async #rememberNote(note) {
-    const clean = normalizeText(note);
-    if (!clean || !this.meta) return;
-    if (this.meta.noteSuggestions?.includes(clean)) return;
+  async #rememberNotes(notes) {
+    if (!this.meta) return;
+    const known = new Set(this.meta.noteSuggestions ?? []);
+    const fresh = [...new Set(notes.map(normalizeText).filter(Boolean))]
+      .filter((note) => !known.has(note));
+    if (!fresh.length) return;
     try {
       await this.#writeMeta((meta) => {
-        meta.noteSuggestions = [...new Set([...(meta.noteSuggestions ?? []), clean])];
+        meta.noteSuggestions = [...new Set([...(meta.noteSuggestions ?? []), ...fresh])];
       });
     } catch (err) {
-      console.warn('Suggerimento nota non salvato (la spesa è comunque salvata):', err.message);
+      console.warn('Suggerimenti nota non salvati (le spese sono comunque salvate):', err.message);
     }
   }
 

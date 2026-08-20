@@ -7,6 +7,7 @@
 import { el, clear, toast, humanError, formatEur, iconButton } from './ui.js';
 import { uiIcon } from './icons.js';
 import { clearKey } from './crypto.js';
+import { count as countQueue } from './outbox.js';
 import { LS_REPO, LS_TOKEN, APP_VERSION } from './config.js';
 
 export function createSettingsSheet(app) {
@@ -193,7 +194,15 @@ export function createSettingsSheet(app) {
       el('button', {
         class: 'btn ghost danger', type: 'button', text: 'Dimentica questo dispositivo',
         onclick: async () => {
-          if (!confirm('Cancellare token e chiave da questo dispositivo?')) return;
+          // La coda vive in IndexedDB e sparirebbe insieme alla chiave: sono
+          // spese che non sono MAI arrivate su GitHub, quindi irrecuperabili.
+          // Cancellarle senza dirlo sarebbe l'unico punto dell'app in cui un
+          // dato si perde in silenzio.
+          const waiting = (await countQueue().catch(() => 0));
+          const warning = waiting
+            ? `\n\n⚠️ Ci sono ${waiting} ${waiting === 1 ? 'spesa' : 'spese'} non ancora sincronizzate: ${waiting === 1 ? 'verrà persa' : 'verranno perse'}.`
+            : '';
+          if (!confirm(`Cancellare token e chiave da questo dispositivo?${warning}`)) return;
           localStorage.removeItem(LS_REPO);
           localStorage.removeItem(LS_TOKEN);
           await clearKey();

@@ -4,6 +4,7 @@ import { el, clear, formatEur, toast, humanError } from './ui.js';
 import { categoryIcon, uiIcon } from './icons.js';
 import { createKeypad, keypadValue, keypadDisplay } from './keypad.js';
 import { MONTH_NAMES_IT, currentMonth, monthsOfYear, sumAmounts } from './model.js';
+import { SEED_CATEGORIES } from './config.js';
 import { createRecurringSheet } from './recurring.js';
 
 // Ordine FISSO (F4.9): la posizione deve diventare memoria muscolare, quindi
@@ -19,13 +20,17 @@ const TILE_ORDER = [
 
 export function createEntryScreen(app) {
   const grid = el('div', { class: 'cat-grid' });
-  const node = el('section', { class: 'screen', id: 'screen-entry' }, [grid]);
+  const queue = el('div', { class: 'queue' });
+  const node = el('section', { class: 'screen', id: 'screen-entry' }, [grid, queue]);
   const sheet = createSheet(app);
   const recurring = createRecurringSheet(app);
   node.append(sheet.node, recurring.node);
 
   function render() {
-    const categories = app.store?.meta?.categories ?? [];
+    // Senza store le categorie vengono dai seed spediti con l'app. Non è un
+    // ripiego: syncCategoryLabels stabilisce che le etichette dell'app battono
+    // quelle salvate, quindi la griglia offline è identica a quella online.
+    const categories = app.store?.meta?.categories ?? SEED_CATEGORIES;
     const byId = new Map(categories.map((c) => [c.id, c]));
 
     // TILE_ORDER dà l'ordine; eventuali categorie aggiunte dopo finiscono in coda.
@@ -47,13 +52,60 @@ export function createEntryScreen(app) {
 
     // Ventesima tessera: non registra una spesa, apre i canoni ricorrenti.
     // Riempie lo slot che restava vuoto e li mette dove si pensa alle spese.
+    // Senza store non ha nulla da leggere né dove scrivere: si spegne.
     grid.append(el('button', {
       class: 'cat-tile special', type: 'button', 'aria-label': 'Canoni ricorrenti',
+      disabled: !app.store,
       onclick: () => recurring.open(),
     }, [
       el('span', { class: 'ico', html: categoryIcon('canoni') }),
       el('span', { class: 'label', text: 'Canoni' }),
     ]));
+
+    renderQueue();
+  }
+
+  /**
+   * Le spese non ancora sincronizzate. Senza questo elenco si sono digitate
+   * tre spese senza avere NESSUN modo di sapere se ci sono ancora — ed è anche
+   * l'unico posto in cui correggerne una prima che parta: si cancella e si
+   * reinserisce. La modifica vera di una voce in coda non vale il codice che
+   * costerebbe.
+   */
+  function renderQueue() {
+    clear(queue);
+    const waiting = app.pending ?? [];
+    if (!waiting.length) return;
+
+    const labelOf = new Map((app.store?.meta?.categories ?? SEED_CATEGORIES)
+      .map((c) => [c.id, c.label]));
+
+    queue.append(el('div', { class: 'queue-title', text: 'In attesa di rete' }));
+    for (const item of waiting) {
+      const discard = el('button', {
+        class: 'icon-btn', type: 'button', 'aria-label': 'Elimina dalla coda',
+        html: uiIcon('trash'),
+        onclick: () => app.discardPending?.(item.seq),
+      });
+
+      if (item.unreadable) {
+        // Non si scarta in silenzio: si mostra e si lascia cancellare a mano.
+        queue.append(el('div', { class: 'queue-row bad' }, [
+          el('span', { class: 'queue-cat', text: 'Voce illeggibile' }),
+          el('span', { class: 'queue-detail', text: 'cifrata con un\'altra chiave' }),
+          discard,
+        ]));
+        continue;
+      }
+
+      queue.append(el('div', { class: 'queue-row' }, [
+        el('span', { class: 'ico', html: categoryIcon(item.tx.category) }),
+        el('span', { class: 'queue-cat', text: labelOf.get(item.tx.category) ?? item.tx.category }),
+        el('span', { class: 'queue-detail', text: item.tx.detail || '' }),
+        el('span', { class: 'queue-amount num', text: formatEur(item.tx.amount) }),
+        discard,
+      ]));
+    }
   }
 
   return { node, render };
@@ -225,7 +277,7 @@ function createSheet(app) {
     saving = true;
     keypad.setBusy(true);
     try {
-      await app.addTransaction({
+      const saved = await app.addTransaction({
         month,
         category: category.id,
         detail: detailField.value,
@@ -233,7 +285,12 @@ function createSheet(app) {
         amount,
       });
       close();
-      toast(`${category.label} · ${formatEur(amount)}`);
+      // Una spesa accodata NON è una spesa salvata su GitHub: dirlo con lo
+      // stesso messaggio sarebbe una bugia, e chi non se ne accorge esporta
+      // dal Mac un Excel a cui manca.
+      toast(saved?.queued
+        ? `${category.label} · ${formatEur(amount)} · in attesa di rete`
+        : `${category.label} · ${formatEur(amount)}`);
     } catch (err) {
       amountError.textContent = humanError(err);
       toast(humanError(err), 'ko');

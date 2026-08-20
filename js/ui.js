@@ -58,7 +58,10 @@ export function humanError(err) {
     unauthorized: 'Token non valido o scaduto. Rigeneralo nelle impostazioni.',
     rate_limit: 'Troppe richieste a GitHub. Riprova fra qualche minuto.',
     secondary: 'GitHub ha rallentato le scritture. Riprova fra poco.',
-    network: 'Nessuna connessione. La spesa non è stata salvata.',
+    // Non dice più "la spesa non è stata salvata": con la coda offline è
+    // falso, e chi ci crede la ridigita creando un doppione VERO — id diverso,
+    // che nessuna deduplica può assorbire.
+    network: 'Nessuna connessione. Le spese restano sul dispositivo e partono da sole.',
     conflict: 'Conflitto non risolto dopo tre tentativi. Riprova.',
     unprocessable: 'Scrittura rifiutata da GitHub.',
   };

@@ -9,8 +9,9 @@
 
 import {
   PBKDF2_ITERATIONS, ENVELOPE_FORMAT, KEYRING_FORMAT, KEYCHECK_PLAINTEXT,
-  SALT_BYTES, IV_BYTES, IDB_NAME, IDB_VERSION, IDB_STORE, IDB_KEY_ID,
+  SALT_BYTES, IV_BYTES, IDB_STORE, IDB_KEY_ID,
 } from './config.js';
+import { withStore } from './idb.js';
 import { WrongPassphraseError, DecryptError, FormatError } from './errors.js';
 
 const encoder = new TextEncoder();
@@ -161,60 +162,25 @@ export async function openKeyring(keyring, passphrase) {
 //
 // Non localStorage: una CryptoKey non estraibile si serializza solo con
 // structured clone, che è ciò che usa IndexedDB.
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) {
-        db.createObjectStore(IDB_STORE, { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function tx(db, mode, fn) {
-  return new Promise((resolve, reject) => {
-    const t = db.transaction(IDB_STORE, mode);
-    const req = fn(t.objectStore(IDB_STORE));
-    t.oncomplete = () => resolve(req?.result);
-    t.onerror = () => reject(t.error);
-    t.onabort = () => reject(t.error);
-  });
-}
+//
+// L'apertura del database sta in idb.js, non qui: è condivisa con la coda
+// offline, e due moduli che aprono lo stesso database con due upgrade diversi
+// si escludono a vicenda. Il perché per esteso è in testa a quel file.
 
 /** Salva chiave e salt insieme: il salt serve a validare le buste in lettura. */
 export async function saveKey(key, salt, iterations) {
-  const db = await openDB();
-  try {
-    await tx(db, 'readwrite', (store) =>
-      store.put({ id: IDB_KEY_ID, key, salt, iterations }));
-  } finally {
-    db.close();
-  }
+  await withStore(IDB_STORE, 'readwrite', (store) =>
+    store.put({ id: IDB_KEY_ID, key, salt, iterations }));
 }
 
 /** @returns {Promise<{key, salt, iterations}|null>} null se mai configurato o evictato. */
 export async function loadKey() {
-  const db = await openDB();
-  try {
-    const rec = await tx(db, 'readonly', (store) => store.get(IDB_KEY_ID));
-    return rec ?? null;
-  } finally {
-    db.close();
-  }
+  const rec = await withStore(IDB_STORE, 'readonly', (store) => store.get(IDB_KEY_ID));
+  return rec ?? null;
 }
 
 export async function clearKey() {
-  const db = await openDB();
-  try {
-    await tx(db, 'readwrite', (store) => store.delete(IDB_KEY_ID));
-  } finally {
-    db.close();
-  }
+  await withStore(IDB_STORE, 'readwrite', (store) => store.delete(IDB_KEY_ID));
 }
 
 /**

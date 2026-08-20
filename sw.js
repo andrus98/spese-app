@@ -7,18 +7,64 @@
 const VERSION = new URL(self.location.href).searchParams.get('v') ?? 'dev';
 const CACHE = `spese-${VERSION}`;
 
-// Minimo indispensabile per aprire l'app offline. Il resto entra in cache da
-// solo alla prima visita (vedi il fetch handler): un elenco lungo e scritto a
-// mano si rompe in silenzio appena si rinomina un file, e un precache che
-// fallisce impedisce al worker di attivarsi.
-const CORE = ['./', './index.html', './css/app.css', './js/app.js', './manifest.webmanifest'];
+// Il guscio COMPLETO, non il minimo indispensabile.
+//
+// Prima bastava poco: il resto entrava in cache da solo alla prima visita, e
+// l'app offline non funzionava comunque. Con la coda offline non è più vero —
+// l'inserimento deve partire senza rete — e `app.js` importa una ventina di
+// moduli: se ne manca uno, l'avvio offline è una schermata bianca.
+//
+// La finestra scoperta è stretta ma reale: subito dopo un cambio di
+// APP_VERSION la cache è nuova e contiene solo questo elenco, perché quella
+// vecchia viene cancellata in `activate`.
+//
+// L'elenco è scritto a mano — non c'è un build step che possa generarlo — ma
+// NON si rompe in silenzio quando si rinomina un file: un test cammina il
+// grafo degli import a partire da app.js e verifica che sia tutto qui
+// (dev/selftest.js, suite PWA).
+const CORE = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './css/app.css',
+  './icons/icon-180.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './js/app.js',
+  './js/config.js',
+  './js/crypto.js',
+  './js/errors.js',
+  './js/export-xlsx.js',
+  './js/github.js',
+  './js/icons.js',
+  './js/idb.js',
+  './js/keypad.js',
+  './js/kpi.js',
+  './js/model.js',
+  './js/outbox.js',
+  './js/recurring.js',
+  './js/screen-entry.js',
+  './js/screen-income.js',
+  './js/screen-movements.js',
+  './js/screen-settings.js',
+  './js/screen-summary.js',
+  './js/setup.js',
+  './js/store.js',
+  './js/ui.js',
+  './js/zip.js',
+];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then((cache) => cache.addAll(CORE))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    // Uno per uno dentro allSettled, MAI addAll: addAll è atomico, e un solo
+    // file irraggiungibile farebbe fallire l'intero install lasciando il
+    // worker non attivo — cioè nessun guscio offline invece di uno parziale.
+    const results = await Promise.allSettled(CORE.map((url) => cache.add(url)));
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    if (failed) console.warn(`[sw] ${failed} risorse su ${CORE.length} non precacheate`);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {

@@ -3,7 +3,9 @@
 
 import * as C from '../js/crypto.js';
 import * as M from '../js/model.js';
-import { PBKDF2_ITERATIONS } from '../js/config.js';
+import * as IDB from '../js/idb.js';
+import * as OB from '../js/outbox.js';
+import { PBKDF2_ITERATIONS, IDB_STORE, IDB_STORE_OUTBOX } from '../js/config.js';
 import { WrongPassphraseError, DecryptError, ValidationError, FormatError, GitHubError, KIND } from '../js/errors.js';
 import { GitHubClient, isNotFound, isConflict } from '../js/github.js';
 import { Store } from '../js/store.js';
@@ -180,6 +182,67 @@ async function run() {
   await test('clearKey svuota', async () => {
     await C.clearKey();
     eq(await C.loadKey(), null);
+  });
+
+  // Il difetto che questo test esiste per impedire: un dispositivo già
+  // configurato arriva all'upgrade con "keys" che esiste GIA'. Un handler che
+  // creasse solo il proprio store non creerebbe nulla, la versione salirebbe
+  // lo stesso, e "outbox" non nascerebbe mai piu' — nessun upgrade successivo
+  // scatterebbe. Si rompe solo su un dispositivo reale, mai in locale.
+  await test('l\'upgrade da v1 crea outbox e non perde la chiave', async () => {
+    const NAME = 'spese-test-migrazione';
+    const wipe = () => new Promise((resolve) => {
+      const req = indexedDB.deleteDatabase(NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    });
+    await wipe();
+
+    // v1 esattamente com'era prima di questo lavoro: il solo store "keys".
+    const v1 = await new Promise((resolve, reject) => {
+      const req = indexedDB.open(NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('keys', { keyPath: 'id' });
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    assert(!v1.objectStoreNames.contains(IDB_STORE_OUTBOX), 'la v1 non deve avere outbox');
+    await IDB.tx(v1, IDB_STORE, 'readwrite', (store) =>
+      store.put({ id: 'aesKey', key, salt, iterations: FAST }));
+    v1.close();
+
+    // v2: stesso database, l'upgrade del codice di produzione.
+    const v2 = await IDB.openDB(NAME, 2);
+    try {
+      assert(v2.objectStoreNames.contains(IDB_STORE), 'keys perso nell\'upgrade');
+      assert(v2.objectStoreNames.contains(IDB_STORE_OUTBOX), 'outbox non creato: e il difetto C1');
+
+      const rec = await IDB.tx(v2, IDB_STORE, 'readonly', (store) => store.get('aesKey'));
+      assert(rec, 'la chiave non e sopravvissuta all\'upgrade');
+      assert(rec.key instanceof CryptoKey, 'la chiave riletta non e una CryptoKey');
+      assert(rec.key.extractable === false, 'la chiave riletta e estraibile');
+      // Non basta che ci sia: deve ancora cifrare e decifrare davvero.
+      const env = await C.encryptJSON({ ok: true }, rec.key, rec.salt, FAST);
+      eq(await C.decryptEnvelope(env, rec.key, rec.salt), { ok: true });
+
+      // E lo store nuovo deve essere usabile, non solo esistere.
+      const seq = await IDB.tx(v2, IDB_STORE_OUTBOX, 'readwrite', (store) =>
+        store.add({ enqueuedAt: 'x' }));
+      eq(seq, 1, 'seq deve partire da 1 e autoincrementare');
+    } finally {
+      v2.close();
+      await wipe();
+    }
+  });
+
+  await test('il database vero ha entrambi gli store', async () => {
+    const db = await IDB.openDB();
+    try {
+      assert(db.objectStoreNames.contains(IDB_STORE), 'manca keys');
+      assert(db.objectStoreNames.contains(IDB_STORE_OUTBOX), 'manca outbox');
+    } finally {
+      db.close();
+    }
   });
 
   // ===================== model: importi ====================================
@@ -620,6 +683,9 @@ async function run() {
     repo.write = (path, text) => files.set(path, { text, sha: `sha${++counter}` });
 
     repo.fetchImpl = async (url, options = {}) => {
+      // Rete assente: fetch RIGETTA, non risponde con uno stato. È così che
+      // GitHubClient riconosce KIND.NETWORK.
+      if (repo.offline) throw new TypeError('Failed to fetch');
       const path = decodeURIComponent(url.split('/contents/')[1] ?? '');
       const method = options.method ?? 'GET';
       const reply = (status, body, headers = {}) => ({
@@ -862,6 +928,200 @@ async function run() {
     eq(store.meta.income.length, 1, 'un importo a zero rimuove la voce');
   });
 
+
+  // ===================== coda offline (fase O2) ============================
+  suite('coda offline');
+
+  // Ogni test parte da una coda vuota: `outbox` vive nel database vero, e una
+  // suite che dipende dall'ordine di esecuzione non serve a niente.
+  const withEmptyQueue = async (fn) => {
+    await OB.clear();
+    try { await fn(); } finally { await OB.clear(); }
+  };
+
+  /**
+   * Store finto pronto all'uso, con l'anno 2026 caricato.
+   *
+   * `storeKey`/`storeSalt` sono la chiave con cui lo store cifra i file su
+   * GitHub, diversa da quella della coda: serve a rileggere il file scritto e
+   * verificarne il contenuto REALE. Le due chiavi coincidono nell'app; qui
+   * tenerle distinte prova anche che coda e dati non si mescolano.
+   */
+  const readyStore = async () => {
+    const { store, repo, key: storeKey, salt: storeSalt } = await freshStore();
+    await store.ensureMeta(2026);
+    await store.loadYear(2026);
+    return { store, repo, storeKey, storeSalt };
+  };
+
+  /** Le transazioni davvero presenti nel file su GitHub, senza dedupe di comodo. */
+  const savedMonth = async (repo, storeKey, storeSalt, month) =>
+    (await decryptAt(repo, storeKey, storeSalt, `data/${month.slice(0, 4)}/${month}.json`)).transactions;
+
+  const tx = (month, category, detail, amount, note) =>
+    M.makeTransaction({ month, category, detail, amount, note });
+
+  await test('accoda, rilegge, e nella coda finisce SOLO ciphertext', async () => {
+    await withEmptyQueue(async () => {
+      const original = tx('2026-08', 'caffe', 'caffe-segreto', '1,20');
+      const seq = await OB.enqueue(original, key, salt);
+      assert(typeof seq === 'number', 'enqueue deve restituire il seq');
+      eq(await OB.count(), 1);
+
+      const entries = await OB.list(key, salt);
+      eq(entries.length, 1);
+      eq(entries[0].tx, original, 'la transazione deve tornare identica');
+
+      const rows = await IDB.withStore(IDB_STORE_OUTBOX, 'readonly', (s) => s.getAll());
+      assert(!JSON.stringify(rows).includes('caffe-segreto'),
+        'il dettaglio e leggibile in chiaro nella coda!');
+    });
+  });
+
+  await test('una voce illeggibile non sparisce in silenzio', async () => {
+    await withEmptyQueue(async () => {
+      await OB.enqueue(tx('2026-08', 'casa', 'x', 1), key, salt);
+      // Corrompe la busta come farebbe una chiave diversa da quella di cifratura.
+      const rows = await IDB.withStore(IDB_STORE_OUTBOX, 'readonly', (s) => s.getAll());
+      rows[0].envelope.payload = 'AAAAAAAAAAAAAAAAAAAA';
+      await IDB.withStore(IDB_STORE_OUTBOX, 'readwrite', (s) => s.put(rows[0]));
+
+      const entries = await OB.list(key, salt);
+      eq(entries.length, 1, 'la voce illeggibile non deve sparire');
+      eq(entries[0].unreadable, true);
+      assert(entries[0].tx === undefined, 'non deve esserci una tx fasulla');
+    });
+  });
+
+  await test('il flush scrive UNA volta per mese, non una per spesa', async () => {
+    await withEmptyQueue(async () => {
+      const { store, repo } = await readyStore();
+      const before = repo.putCount;
+
+      await OB.enqueue(tx('2026-08', 'caffe', 'a', 1), key, salt);
+      await OB.enqueue(tx('2026-08', 'caffe', 'b', 2), key, salt);
+      await OB.enqueue(tx('2026-08', 'svago', 'c', 3), key, salt);
+      await OB.enqueue(tx('2026-09', 'casa', 'd', 4), key, salt);
+
+      const res = await OB.flush(store, key, salt);
+      eq(res.error, null);
+      eq(res.written, 4);
+      eq(res.pending, 0, 'la coda deve svuotarsi');
+      eq(repo.putCount - before, 2, 'due mesi = due PUT, non quattro');
+      eq(store.transactionsOf('2026-08').length, 3);
+      eq(store.transactionsOf('2026-09').length, 1);
+    });
+  });
+
+  await test('le note nuove costano UNA scrittura su meta, non una per spesa', async () => {
+    await withEmptyQueue(async () => {
+      const { store, repo } = await readyStore();
+      const before = repo.putCount;
+
+      await OB.enqueue(tx('2026-08', 'viaggi', 'a', 1, 'Ovindoli'), key, salt);
+      await OB.enqueue(tx('2026-08', 'viaggi', 'b', 2, 'Madonna'), key, salt);
+      await OB.enqueue(tx('2026-08', 'viaggi', 'c', 3, 'Ovindoli'), key, salt);
+
+      const res = await OB.flush(store, key, salt);
+      eq(res.error, null);
+      eq(repo.putCount - before, 2, 'un PUT sul mese + un PUT su meta');
+      eq(store.meta.noteSuggestions.sort(), ['Madonna', 'Ovindoli']);
+    });
+  });
+
+  // C4: non serve un secondo dispositivo. La PUT arriva, la risposta si perde,
+  // la voce resta in coda e al tentativo dopo verrebbe riscritta.
+  await test('riprovare una voce già scritta non duplica la spesa', async () => {
+    await withEmptyQueue(async () => {
+      const { store, repo, storeKey, storeSalt } = await readyStore();
+      const doppia = tx('2026-08', 'caffe', 'x', 1);
+
+      await OB.enqueue(doppia, key, salt);
+      eq((await OB.flush(store, key, salt)).written, 1);
+      await OB.enqueue(doppia, key, salt); // stessa transazione, stesso ULID
+      eq((await OB.flush(store, key, salt)).error, null);
+
+      // L'asserzione va fatta sul FILE, non su transactionsOf: quello
+      // deduplica (O3.3) e maschererebbe esattamente il doppione da rilevare.
+      const saved = await savedMonth(repo, storeKey, storeSalt, '2026-08');
+      eq(saved.length, 1, 'doppione nel file su GitHub: il guard sull\'id non funziona');
+      eq(store.transactionsOf('2026-08').length, 1);
+    });
+  });
+
+  await test('senza rete la coda NON si consuma', async () => {
+    await withEmptyQueue(async () => {
+      const { store, repo } = await readyStore();
+      await OB.enqueue(tx('2026-08', 'casa', 'x', 5), key, salt);
+
+      repo.offline = true;
+      const res = await OB.flush(store, key, salt);
+      repo.offline = false;
+
+      assert(res.error, 'doveva riportare un errore');
+      eq(res.error.kind, KIND.NETWORK);
+      eq(res.written, 0);
+      eq(res.pending, 1, 'la coda non deve svuotarsi se la scrittura fallisce');
+    });
+  });
+
+  await test('anno chiuso: la coda resta intatta, l\'errore dice perché', async () => {
+    await withEmptyQueue(async () => {
+      const { store } = await readyStore();
+      await store.setLocked(true);
+      await OB.enqueue(tx('2026-08', 'casa', 'x', 5), key, salt);
+
+      const res = await OB.flush(store, key, salt);
+      assert(res.error instanceof ValidationError, `atteso ValidationError, ottenuto ${res.error}`);
+      assert(res.error.message.includes('chiuso'), 'il messaggio deve spiegare il perché');
+      eq(res.written, 0);
+      eq(res.pending, 1);
+    });
+  });
+
+  await test('due flush in parallelo non si sovrappongono', async () => {
+    await withEmptyQueue(async () => {
+      const { store, repo, storeKey, storeSalt } = await readyStore();
+      await OB.enqueue(tx('2026-08', 'casa', 'x', 5), key, salt);
+
+      const [a, b] = await Promise.all([
+        OB.flush(store, key, salt),
+        OB.flush(store, key, salt),
+      ]);
+      eq([a, b].filter((r) => r.skipped).length, 1, 'uno dei due doveva essere saltato');
+      const saved = await savedMonth(repo, storeKey, storeSalt, '2026-08');
+      eq(saved.length, 1, 'scritta due volte nel file');
+      eq(await OB.count(), 0);
+    });
+  });
+
+  await test('spese di due anni passano entrambe, e l\'anno caricato torna com\'era', async () => {
+    await withEmptyQueue(async () => {
+      const { store } = await readyStore();
+      await OB.enqueue(tx('2026-08', 'casa', 'quest-anno', 1), key, salt);
+      await OB.enqueue(tx('2025-12', 'casa', 'anno-scorso', 2), key, salt);
+
+      const res = await OB.flush(store, key, salt);
+      eq(res.error, null);
+      eq(res.written, 2);
+      eq(store.year, 2026, 'l\'anno caricato deve tornare quello di partenza');
+      eq(store.transactionsOf('2026-08').length, 1);
+
+      await store.loadYear(2025);
+      eq(store.transactionsOf('2025-12').length, 1, 'il 2025 non e stato scritto');
+    });
+  });
+
+  await test('la coda sopravvive a una ricarica dell\'app', async () => {
+    await withEmptyQueue(async () => {
+      await OB.enqueue(tx('2026-08', 'casa', 'x', 5), key, salt);
+      // Nessuna cache in memoria da svuotare: ogni operazione riapre il
+      // database. Rileggere qui equivale a rileggere dopo un riavvio.
+      const entries = await OB.list(key, salt);
+      eq(entries.length, 1);
+      eq(entries[0].tx.detail, 'x');
+    });
+  });
 
   // ===================== tastierino ========================================
   suite('tastierino');
@@ -1568,6 +1828,46 @@ async function run() {
     assert(response.ok, 'apple-touch-icon mancante');
     const bytes = new Uint8Array(await response.arrayBuffer());
     eq(new DataView(bytes.buffer).getUint32(16), 180);
+  });
+
+  // L'elenco CORE del service worker è scritto a mano, e un elenco scritto a
+  // mano si rompe in silenzio appena si rinomina o si aggiunge un modulo: il
+  // sintomo sarebbe una schermata bianca al primo avvio offline dopo un
+  // deploy, cioè nel momento e sul dispositivo peggiori per accorgersene.
+  // Questo test cammina il grafo degli import a partire da app.js.
+  await test('il precache copre ogni modulo che app.js importa', async () => {
+    const source = await fetch('../sw.js').then((r) => r.text());
+    const block = source.match(/const CORE = \[([\s\S]*?)\];/);
+    assert(block, 'CORE non trovato in sw.js');
+    const core = new Set([...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
+
+    const seen = new Set();
+    const queue = ['./js/app.js'];
+    while (queue.length) {
+      const module = queue.shift();
+      if (seen.has(module)) continue;
+      seen.add(module);
+      const code = await fetch(`../${module.slice(2)}`).then((r) => r.text());
+      // Import statici E dinamici: entrambi servono a runtime.
+      for (const m of code.matchAll(/(?:from|import)\s*\(?\s*'(\.\/[^']+)'/g)) {
+        queue.push(`./js/${m[1].slice(2)}`);
+      }
+    }
+
+    assert(seen.size >= 15, `grafo degli import sospettosamente piccolo: ${seen.size}`);
+    for (const module of seen) {
+      assert(core.has(module), `${module} manca dal precache del service worker`);
+    }
+  });
+
+  await test('ogni voce del precache esiste davvero', async () => {
+    const source = await fetch('../sw.js').then((r) => r.text());
+    const core = [...source.match(/const CORE = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)]
+      .map((m) => m[1]);
+    for (const url of core) {
+      const response = await fetch(`../${url.slice(2)}`);
+      assert(response.ok, `${url} è nel precache ma non esiste (${response.status})`);
+    }
   });
 
   await test('il service worker non mette MAI in cache i dati', async () => {
