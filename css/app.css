@@ -652,6 +652,39 @@ select.field { -webkit-appearance: none; appearance: none; }
 
 /* ============================ Movimenti ================================= */
 
+/* Ricerca nel mese. Margine e non padding: la lente e la × sono posizionate
+   in assoluto dentro la barra, e un padding sposterebbe il riquadro su cui
+   si centrano rispetto al campo. */
+.searchbar { position: relative; display: flex; align-items: center; margin-bottom: 10px; }
+
+.search-ico {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  display: flex;
+  color: var(--text-faint);
+  /* Il tocco deve arrivare al campo: l'icona non è un bersaglio. */
+  pointer-events: none;
+}
+.search-ico svg { width: 17px; height: 17px; }
+.searchbar:focus-within .search-ico { color: var(--accent); }
+
+/* Spazio a sinistra per la lente, a destra per la ×: il testo non deve
+   finirci sotto quando la ricerca è lunga. */
+.search-input { padding-left: 39px; padding-right: 42px; }
+
+/* Sta DENTRO la barra, all'estremo destro, e compare solo quando c'è una
+   ricerca da annullare. Fondo più chiaro del campo, o sparirebbe dentro. */
+.search-clear {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px;
+  background: var(--surface-3);
+  color: var(--text-dim);
+}
+.search-clear:active { background: var(--hairline); }
+.search-clear svg { width: 14px; height: 14px; }
+/* Il bersaglio del dito è più largo del cerchio: 28px sono pochi per un
+   pollice, e ingrandire il cerchio lo farebbe toccare i bordi del campo. */
+.search-clear::after { content: ''; position: absolute; inset: -8px; }
+
 .movements-total { display: flex; justify-content: space-between; align-items: baseline;
                    font-size: 12.5px; color: var(--text-dim); font-weight: 600; padding: 0 2px 8px; }
 .movements-total .num { font-size: 15px; color: var(--text); }

@@ -12,8 +12,8 @@ deriva da una passphrase che non lascia mai il dispositivo.
 
 Tre schermate: **Nuova spesa** (griglia di categorie e tastierino),
 **Riepilogo** (gli stessi KPI del vecchio foglio Excel) e **Movimenti**
-(correzione ed export). Dietro l'ingranaggio: entrate, canoni ricorrenti,
-backup e stato del dispositivo.
+(ricerca nel mese, correzione ed export). Dietro l'ingranaggio: entrate,
+canoni ricorrenti, backup e stato del dispositivo.
 
 Il mese è l'unica unità temporale: il giorno non viene registrato da nessuna
 parte. Ogni scrittura è un commit sul repo dati.

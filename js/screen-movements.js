@@ -8,6 +8,7 @@ import { downloadWorkbook } from './export-xlsx.js';
 
 export function createMovementsScreen(app) {
   let month = currentMonth();
+  let query = '';
 
   const periodLabel = el('button', { class: 'period-label', type: 'button' });
   const list = el('div', { class: 'movements' });
@@ -26,6 +27,51 @@ export function createMovementsScreen(app) {
     }),
   ]);
 
+  // Una casella sola per categoria e dettaglio: cercando "caffè" non si sa —
+  // e non interessa — in quale dei due campi la parola si trovi.
+  const searchInput = el('input', {
+    class: 'field search-input', type: 'text',
+    placeholder: 'Cerca categoria o dettaglio',
+    'aria-label': 'Cerca fra i movimenti del mese',
+    // `search` mette "Cerca" al posto di "A capo" sulla tastiera di iOS.
+    enterkeyhint: 'search',
+    autocomplete: 'off', autocorrect: 'off', autocapitalize: 'none', spellcheck: 'false',
+  });
+
+  const clearBtn = el('button', {
+    class: 'icon-btn search-clear', type: 'button', hidden: true,
+    'aria-label': 'Annulla la ricerca',
+    html: uiIcon('close'), onclick: () => setQuery(''),
+  });
+
+  const searchBar = el('div', { class: 'searchbar' }, [
+    el('span', { class: 'search-ico', html: uiIcon('search') }),
+    searchInput,
+    clearBtn,
+  ]);
+
+  searchInput.addEventListener('input', () => {
+    // Cancellare tutto è l'altro modo di uscire dalla ricerca, oltre alla ×,
+    // quindi passa dalla stessa strada — blur compreso: senza, la tastiera di
+    // sistema resterebbe aperta a coprire mezzo elenco proprio mentre
+    // l'elenco torna completo.
+    if (!searchInput.value) { setQuery(''); return; }
+    query = searchInput.value;
+    render();
+  });
+
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setQuery('');
+    else if (event.key === 'Enter') searchInput.blur();
+  });
+
+  function setQuery(value) {
+    query = value;
+    searchInput.value = value;
+    if (!value) searchInput.blur();
+    render();
+  }
+
   const exportBtn = iconButton(uiIcon('download'), 'Esporta Excel', {
     class: 'btn',
     onclick: () => {
@@ -40,7 +86,7 @@ export function createMovementsScreen(app) {
   });
 
   const node = el('section', { class: 'screen' }, [
-    header, totalLine, list,
+    header, searchBar, totalLine, list,
     el('div', { class: 'export-zone' }, [exportBtn]),
     editor.node,
   ]);
@@ -58,24 +104,41 @@ export function createMovementsScreen(app) {
     periodLabel.textContent = `${monthLabel(month)} ${yearOf(month)}`;
     clear(list);
     clear(totalLine);
+    clearBtn.hidden = !query;
 
     if (!app.store) return;
 
     if (yearOf(month) !== app.store.year) {
+      searchBar.hidden = true;
       list.append(el('div', { class: 'empty-state', text: `Il ${yearOf(month)} non è caricato.` }));
       return;
     }
 
-    const rows = app.store.transactionsOf(month);
+    const all = app.store.transactionsOf(month);
     const labelOf = new Map(app.store.meta.categories.map((c) => [c.id, c.label]));
+    const tokens = searchTokens(query);
+    const rows = tokens.length ? all.filter((tx) => matchesSearch(tx, tokens, labelOf)) : all;
+
+    // Su un mese vuoto la casella non serve a niente: sparisce, a meno che non
+    // sia proprio lei ad aver svuotato l'elenco.
+    searchBar.hidden = !all.length && !tokens.length;
 
     totalLine.append(
-      el('span', { text: `${rows.length} ${rows.length === 1 ? 'movimento' : 'movimenti'}` }),
+      el('span', {
+        text: tokens.length
+          ? `${rows.length} ${rows.length === 1 ? 'risultato' : 'risultati'}`
+          : `${rows.length} ${rows.length === 1 ? 'movimento' : 'movimenti'}`,
+      }),
       el('span', { class: 'num', text: formatEur(sumAmounts(rows.map((t) => t.amount))) }),
     );
 
     if (!rows.length) {
-      list.append(el('div', { class: 'empty-state', text: 'Nessun movimento in questo mese.' }));
+      list.append(el('div', {
+        class: 'empty-state',
+        text: tokens.length
+          ? `Nessun movimento per "${query.trim()}" in questo mese.`
+          : 'Nessun movimento in questo mese.',
+      }));
       return;
     }
 
@@ -95,6 +158,30 @@ export function createMovementsScreen(app) {
   }
 
   return { node, render };
+}
+
+// --- Ricerca ----------------------------------------------------------------
+
+/**
+ * Minuscole e senza accenti: "caffè" si digita "caffe" quasi sempre, e una
+ * ricerca che non trova "Caffè" perché manca l'accento sembra un guasto.
+ */
+const normalize = (value) => (value ?? '')
+  .toString()
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '');
+
+/** Parole, non stringa unica: così "pizza sabato" trova anche "sabato pizza". */
+export const searchTokens = (query) => normalize(query).split(/\s+/).filter(Boolean);
+
+/**
+ * Vero se la transazione contiene TUTTE le parole cercate, indifferentemente
+ * nella categoria o nel dettaglio: chi cerca non pensa per campi.
+ */
+export function matchesSearch(tx, tokens, labelOf) {
+  const haystack = normalize(`${labelOf.get(tx.category) ?? tx.category ?? ''} ${tx.detail ?? ''}`);
+  return tokens.every((token) => haystack.includes(token));
 }
 
 // --- Editor -----------------------------------------------------------------

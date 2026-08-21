@@ -20,9 +20,13 @@
 //        per intero, mostrando l'elenco di quelli attivi. Dai Canoni si
 //        possono creare categorie nuove: nascono sul database e restano fuori
 //        dalla griglia, che è dimensionata per non scorrere.
+// 0.5.1: ricerca nei Movimenti. Una casella sola sopra l'elenco, che filtra il
+//        mese per categoria E dettaglio insieme; si esce con la × dentro la
+//        barra o svuotando il campo, e in entrambi i casi la tastiera si
+//        chiude da sola.
 // Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
 // senza di lui il codice nuovo non arriverebbe sul dispositivo.
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.5.1';
 
 // --- Crittografia -----------------------------------------------------------
 

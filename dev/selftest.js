@@ -18,7 +18,7 @@ import { buildWorkbook } from '../js/export-xlsx.js';
 import { el } from '../js/ui.js';
 import { createSummaryScreen } from '../js/screen-summary.js';
 import { createSettingsSheet } from '../js/screen-settings.js';
-import { createMovementsScreen } from '../js/screen-movements.js';
+import { createMovementsScreen, searchTokens, matchesSearch } from '../js/screen-movements.js';
 import { createIncomeScreen } from '../js/screen-income.js';
 import { createEntryScreen } from '../js/screen-entry.js';
 import { createRecurringSheet } from '../js/recurring.js';
@@ -1670,6 +1670,136 @@ async function run() {
     const text = screen.node.textContent;
     assert(text.includes('Esporta Excel'), 'manca il pulsante di export');
     assert(text.includes('movimenti') || text.includes('movimento'), 'manca il conteggio');
+    screen.node.remove();
+  });
+
+
+  // ===================== ricerca nei movimenti =============================
+  suite('ricerca movimenti');
+
+  const searchRows = [
+    { id: 'S1', month: '2026-08', category: 'caffe', detail: 'Colazione', amount: 1.4, note: '', createdAt: '2026-08-01T08:00:00Z' },
+    { id: 'S2', month: '2026-08', category: 'pasti_fuori', detail: 'Pizza con Marco', amount: 28, note: 'sabato', createdAt: '2026-08-02T20:00:00Z' },
+    { id: 'S3', month: '2026-08', category: 'alimenti', detail: 'Spesa Conad', amount: 62.35, note: '', createdAt: '2026-08-03T10:00:00Z' },
+  ];
+
+  // Qualunque mese: la schermata parte da quello corrente, e un test legato a
+  // una data fissa smetterebbe di provare qualcosa il mese dopo.
+  const searchApp = {
+    year: 2026, refresh() {},
+    store: {
+      year: 2026, meta: excelMeta, transactions: searchRows,
+      transactionsOf: () => searchRows,
+    },
+  };
+
+  /** Monta la schermata e restituisce di che pilotarla. */
+  function mountMovements(app = searchApp) {
+    const screen = createMovementsScreen(app);
+    document.body.append(screen.node);
+    screen.render();
+    const input = screen.node.querySelector('.search-input');
+    return {
+      screen, input,
+      clearBtn: screen.node.querySelector('.search-clear'),
+      type: (value) => {
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      titles: () => [...screen.node.querySelectorAll('.mov-title')].map((n) => n.textContent),
+    };
+  }
+
+  await test('la query si spezza in parole, senza accenti né maiuscole', () => {
+    eq(searchTokens('  Caffè   AL Bar '), ['caffe', 'al', 'bar']);
+    eq(searchTokens(''), []);
+    eq(searchTokens('   '), []);
+  });
+
+  await test('una voce si trova per categoria o per dettaglio, con tutte le parole', () => {
+    const labelOf = new Map(SEED_CATEGORIES.map((c) => [c.id, c.label]));
+    const pizza = searchRows[1];
+    assert(matchesSearch(pizza, searchTokens('pasti'), labelOf), 'non trovata per categoria');
+    assert(matchesSearch(pizza, searchTokens('marco'), labelOf), 'non trovata per dettaglio');
+    assert(matchesSearch(pizza, searchTokens('marco pizza'), labelOf), 'l\'ordine delle parole non deve contare');
+    assert(!matchesSearch(pizza, searchTokens('pizza domenica'), labelOf), 'basta una parola su due per escluderla');
+    // La nota resta fuori: la ricerca è su categoria e dettaglio.
+    assert(!matchesSearch(pizza, searchTokens('sabato'), labelOf), 'la nota non è cercabile');
+    // Senza etichetta si ricade sull'id, che è comunque leggibile.
+    assert(matchesSearch(searchRows[0], searchTokens('caffe'), new Map()), 'id come ripiego');
+  });
+
+  await test('l\'accento cercato o mancante trova comunque "Caffè"', () => {
+    const labelOf = new Map(SEED_CATEGORIES.map((c) => [c.id, c.label]));
+    assert(matchesSearch(searchRows[0], searchTokens('caffe'), labelOf), 'senza accento');
+    assert(matchesSearch(searchRows[0], searchTokens('CAFFÈ'), labelOf), 'con accento e maiuscole');
+  });
+
+  await test('digitando, elenco e totale si riducono a ciò che corrisponde', () => {
+    const { screen, type, titles } = mountMovements();
+    eq(titles().length, 3, 'l\'elenco non parte completo');
+    type('conad');
+    eq(titles(), ['Spesa Conad']);
+    const text = screen.node.textContent;
+    assert(text.includes('1 risultato'), 'manca il conteggio dei risultati');
+    assert(text.includes('62,35'), 'il totale non segue la ricerca');
+    screen.node.remove();
+  });
+
+  await test('la × svuota la ricerca, ripristina l\'elenco e chiude la tastiera', () => {
+    const { screen, input, type, titles, clearBtn } = mountMovements();
+    assert(clearBtn.hidden, 'la × non deve esserci senza una ricerca da annullare');
+    type('conad');
+    input.focus();
+    assert(!clearBtn.hidden, 'la × deve comparire con la ricerca attiva');
+
+    clearBtn.click();
+    eq(input.value, '', 'il campo non è stato svuotato');
+    eq(titles().length, 3, 'l\'elenco non è tornato completo');
+    assert(clearBtn.hidden, 'la × resta visibile senza ricerca');
+    assert(document.activeElement !== input,
+      'il campo ha ancora il focus: su iPhone la tastiera resterebbe aperta sull\'elenco');
+    screen.node.remove();
+  });
+
+  await test('svuotare il campo a mano chiude la tastiera come la ×', () => {
+    const { screen, input, type, titles } = mountMovements();
+    type('pizza');
+    input.focus();
+    type('');
+    eq(titles().length, 3, 'l\'elenco non è tornato completo');
+    assert(document.activeElement !== input, 'il campo ha ancora il focus');
+    screen.node.remove();
+  });
+
+  await test('una ricerca a vuoto lo dice, e la query resta TESTO', () => {
+    const { screen, type } = mountMovements();
+    delete window.__pwned;
+    type('<img src=x onerror="window.__pwned=1">');
+    const empty = screen.node.querySelector('.empty-state');
+    assert(empty?.textContent.includes('Nessun movimento'), 'manca il messaggio di ricerca a vuoto');
+    eq(screen.node.querySelectorAll('img').length, 0, 'la query è finita nel DOM come markup');
+    eq(window.__pwned, undefined, 'la query è stata eseguita');
+    screen.node.remove();
+  });
+
+  await test('la ricerca resta applicata cambiando mese', () => {
+    // Cambiare mese non deve svuotare la casella: si cerca la stessa cosa
+    // spostandosi nel tempo, non si ricomincia da capo ogni volta.
+    const { screen, input, type, titles } = mountMovements();
+    type('pizza');
+    screen.node.querySelectorAll('.period .icon-btn')[1].click();
+    eq(input.value, 'pizza', 'la casella si è svuotata da sola');
+    eq(titles(), ['Pizza con Marco']);
+    screen.node.remove();
+  });
+
+  await test('su un mese senza movimenti la casella sparisce', () => {
+    const { screen } = mountMovements({
+      year: 2026, refresh() {},
+      store: { year: 2026, meta: excelMeta, transactions: [], transactionsOf: () => [] },
+    });
+    assert(screen.node.querySelector('.searchbar').hidden, 'cercare in un elenco vuoto non ha senso');
     screen.node.remove();
   });
 

@@ -89,6 +89,7 @@ const UI = {
   check: '<path d="M5 12.5 10 17.5 19 7"/>',
   chevronLeft: '<path d="M14.5 5 7.5 12l7 7"/>',
   chevronRight: '<path d="M9.5 5l7 7-7 7"/>',
+  search: '<circle cx="10.8" cy="10.8" r="6.3"/><path d="M15.4 15.4 20 20"/>',
   download: '<path d="M12 3.8v11.4"/><path d="M7.6 11l4.4 4.4 4.4-4.4"/>'
     + '<path d="M4.5 16.5v1.8a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-1.8"/>',
   trash: '<path d="M4.5 6.8h15"/><path d="M9.5 6.8V5.2a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5v1.6"/>'
