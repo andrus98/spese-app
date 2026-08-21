@@ -81,6 +81,24 @@ input { font: inherit; color: inherit; }
   overflow: hidden;
 }
 
+/* Installata sulla home, `100dvh` NON vale quanto lo schermo: il guscio finisce
+   una quarantina di px sopra il bordo, e sotto la tab bar resta una fascia nera
+   che nessuna regola può dipingere, perché è fuori dal guscio. Non è la safe
+   area — quella funziona, tant'è che togliendola dalla barra (0.4.6) il margine
+   sotto le icone è sparito davvero.
+   La prova che quella fascia è raggiungibile: `.toast` e `.errorbar` sono
+   `position: fixed`, si risolvono sul viewport VERO e non sui `100dvh`, e
+   infatti finivano sopra la nav bar invece che sopra il suo bordo.
+   Quindi il guscio si fa stirare dal viewport invece che da un'unità di misura.
+   Solo in standalone: in Safari `100dvh` è giusto, ed è costato caro (F4.3). */
+@media (display-mode: standalone) {
+  .app { position: fixed; inset: 0; height: auto; }
+  /* Stesso difetto: `inset: 0` c'è già, ma con un'altezza esplicita la scatola
+     è sovravincolata e vince l'altezza. Senza questo il foglio di inserimento
+     resterebbe sospeso sopra il bordo mentre la barra scende. */
+  dialog.sheet { height: auto; max-height: none; }
+}
+
 /* Intestazione: barra del titolo + eventuale barra di stato. Esiste solo per
    tenere la seconda fuori dalla griglia del guscio (vedi sopra). */
 .topgroup { display: block; }
