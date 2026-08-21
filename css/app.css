@@ -81,24 +81,6 @@ input { font: inherit; color: inherit; }
   overflow: hidden;
 }
 
-/* Installata sulla home, `100dvh` NON vale quanto lo schermo: il guscio finisce
-   una quarantina di px sopra il bordo, e sotto la tab bar resta una fascia nera
-   che nessuna regola può dipingere, perché è fuori dal guscio. Non è la safe
-   area — quella funziona, tant'è che togliendola dalla barra (0.4.6) il margine
-   sotto le icone è sparito davvero.
-   La prova che quella fascia è raggiungibile: `.toast` e `.errorbar` sono
-   `position: fixed`, si risolvono sul viewport VERO e non sui `100dvh`, e
-   infatti finivano sopra la nav bar invece che sopra il suo bordo.
-   Quindi il guscio si fa stirare dal viewport invece che da un'unità di misura.
-   Solo in standalone: in Safari `100dvh` è giusto, ed è costato caro (F4.3). */
-@media (display-mode: standalone) {
-  .app { position: fixed; inset: 0; height: auto; }
-  /* Stesso difetto: `inset: 0` c'è già, ma con un'altezza esplicita la scatola
-     è sovravincolata e vince l'altezza. Senza questo il foglio di inserimento
-     resterebbe sospeso sopra il bordo mentre la barra scende. */
-  dialog.sheet { height: auto; max-height: none; }
-}
-
 /* Intestazione: barra del titolo + eventuale barra di stato. Esiste solo per
    tenere la seconda fuori dalla griglia del guscio (vedi sopra). */
 .topgroup { display: block; }
@@ -167,20 +149,11 @@ input { font: inherit; color: inherit; }
 
 /* ============================ Tab bar =================================== */
 
-/* La barra tocca il bordo BASSO dello schermo: niente safe area in fondo.
-   Riservandola, sotto le etichette restavano 34px di barra vuota (misurato in
-   standalone su un 393×852: box 760→852, contenuto 760→818). Il fondo della
-   barra è `--surface` al 92% su `--bg`, cioè sette livelli RGB di differenza:
-   su OLED quella striscia non si legge come parte della barra, si legge come
-   schermo nero spento sotto la nav bar. Scelta esplicita, contro `F4.5`: la
-   home bar di iOS passa sopra le etichette centrali per un paio di pixel, e
-   va bene così. I 34px recuperati finiscono nella riga `1fr` del guscio,
-   quindi nella griglia delle categorie, che su schermi bassi era al limite
-   (F4.7). */
 .tabbar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  height: var(--tabbar-h);
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border-top: 1px solid var(--hairline);
   backdrop-filter: blur(20px);
@@ -550,10 +523,7 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3p
 .toast {
   position: fixed;
   left: 50%; transform: translateX(-50%);
-  /* Ancorato SOPRA la tab bar: questa misura deve seguire l'altezza della
-     barra, altrimenti il messaggio galleggia staccato. Niente safe area, per
-     lo stesso motivo per cui non ce l'ha più la barra. */
-  bottom: calc(var(--tabbar-h) + 14px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
   padding: 11px 17px; border-radius: var(--r-pill);
   background: var(--surface-3); color: var(--text);
   font-size: 13.5px; font-weight: 600;

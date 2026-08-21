@@ -15,19 +15,9 @@
 //        `overflow: hidden` a `clip`: `hidden` lascia la scatola scorrevole da
 //        codice, e showModal() la scorreva per raggiungere il pulsante di
 //        chiusura. Insieme, le tessere di spesa perdono l'ombra.
-// 0.4.6: la nav bar tocca il bordo basso dello schermo. Riservare
-//        `env(safe-area-inset-bottom)` le lasciava sotto 34px di barra vuota
-//        che su OLED si leggono come schermo nero: la barra sembrava
-//        galleggiare sopra una fascia spenta. Ora la home bar di iOS passa
-//        sopra le etichette, per scelta.
-// 0.4.7: il guscio arriva al bordo dello schermo. La 0.4.6 aveva tolto il
-//        margine sotto le icone ma non la fascia nera: quella non era la safe
-//        area, era `height: 100dvh`, che installata sulla home non vale quanto
-//        lo schermo. In standalone il guscio — e il foglio, che aveva lo stesso
-//        difetto — si fa stirare dal viewport con `position: fixed; inset: 0`.
 // Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
 // senza di lui il codice nuovo non arriverebbe sul dispositivo.
-export const APP_VERSION = '0.4.7';
+export const APP_VERSION = '0.4.5';
 
 // --- Crittografia -----------------------------------------------------------
 
