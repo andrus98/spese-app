@@ -21,6 +21,7 @@ import { createSettingsSheet } from '../js/screen-settings.js';
 import { createMovementsScreen } from '../js/screen-movements.js';
 import { createIncomeScreen } from '../js/screen-income.js';
 import { createEntryScreen } from '../js/screen-entry.js';
+import { createRecurringSheet } from '../js/recurring.js';
 
 const results = [];
 let currentSuite = '';
@@ -412,6 +413,40 @@ async function run() {
       ['spotify', 'vodafone', 'palestra'].map((c) => M.recurringFor(meta, c, '2026-05')),
     );
     eq(total, 84.99);
+  });
+
+  await test('activeRecurring elenca i canoni attivi in quel mese', () => {
+    // È l'elenco che la tessera Canoni mostra in griglia: se sbaglia mese,
+    // mostra un canone che non è ancora partito.
+    eq(M.activeRecurring(meta, '2026-04').map((r) => r.category), ['spotify', 'vodafone']);
+    eq(M.activeRecurring(meta, '2026-05').map((r) => r.category), ['spotify', 'vodafone', 'palestra']);
+    eq(M.activeRecurring({}, '2026-05'), []);
+  });
+
+  // ===================== model: categorie nuove ============================
+  suite('categorie');
+
+  await test('l\'id si ricava dall\'etichetta, senza accenti né spazi', async () => {
+    eq(M.categoryIdFrom('Affitto'), 'affitto');
+    eq(M.categoryIdFrom('Caffè & Cornetto'), 'caffe_cornetto');
+    eq(M.categoryIdFrom('  Assicurazione   Auto '), 'assicurazione_auto');
+    // Solo simboli: non resta niente da cui fare una chiave.
+    await throwsWith(() => M.categoryIdFrom('!!!'), ValidationError);
+  });
+
+  await test('una categoria nuova nasce nascosta e in coda all\'ordine', () => {
+    const created = M.makeCategory('Affitto', SEED_CATEGORIES);
+    eq(created.id, 'affitto');
+    eq(created.label, 'Affitto');
+    eq(created.order, 20, 'deve andare in coda alle 19 del master');
+    eq(created.hidden, true, 'senza icona non può prendersi una tessera');
+  });
+
+  await test('una categoria che esiste già viene rifiutata', async () => {
+    // Anche scritta diversamente: è l'id a decidere, non l'etichetta.
+    await throwsWith(() => M.makeCategory('spotify', SEED_CATEGORIES), ValidationError);
+    await throwsWith(() => M.makeCategory('Spese  mediche', SEED_CATEGORIES), ValidationError);
+    await throwsWith(() => M.makeCategory('   ', SEED_CATEGORIES), ValidationError);
   });
 
   // ===================== model: file =======================================
@@ -913,6 +948,33 @@ async function run() {
     eq(meta2027.recurring.map((r) => r.category).sort(), ['palestra', 'spotify']);
     eq(meta2027.recurring.every((r) => r.from === '2027-01'), true, 'i canoni devono ripartire da gennaio');
     eq(meta2027.categories.length, 19);
+  });
+
+  await test('una categoria creata dai Canoni finisce su GitHub e si rilegge', async () => {
+    const { store, key, salt } = await freshStore();
+    await store.ensureMeta(2026);
+    await store.loadYear(2026);
+
+    const creata = await store.addCategory('Affitto');
+    eq(creata.id, 'affitto');
+    await store.setRecurring([{ category: creata.id, amount: 550, from: '2026-01', to: null }]);
+
+    // Il secondo dispositivo deve vederla, altrimenti il suo canone punta a
+    // una categoria che per lui non esiste e nell'export sparisce.
+    const other = new Store({ client: store.client, key, salt });
+    const { meta } = await other.loadYear(2026);
+    eq(meta.categories.length, 20);
+    eq(meta.categories.at(-1).label, 'Affitto');
+    eq(meta.categories.at(-1).hidden, true, 'deve restare fuori dalla griglia');
+    eq(M.recurringFor(meta, 'affitto', '2026-08'), 550);
+  });
+
+  await test('la stessa categoria non si crea due volte', async () => {
+    const { store } = await freshStore();
+    await store.ensureMeta(2026);
+    await store.addCategory('Affitto');
+    await throwsWith(() => store.addCategory('affitto'), ValidationError);
+    eq(store.meta.categories.length, 20);
   });
 
   await test('entrate: 4 voci per mese, azzerare rimuove la voce (D6)', async () => {
@@ -1550,6 +1612,31 @@ async function run() {
     assert(master.includes('>BILANCIO<'), 'manca la tabella BILANCIO');
   });
 
+  await test('con più di 19 categorie ENTRATE scende invece di sovrapporsi', async () => {
+    // Le categorie si possono aggiungere dai Canoni: se i blocchi sotto
+    // restassero a righe fisse, le SPESE finirebbero sopra le ENTRATE e il
+    // foglio uscirebbe con righe duplicate e fuori ordine — un .xlsx che
+    // Excel non apre.
+    const extra = ['Affitto', 'Assicurazione', 'Netflix', 'Asilo', 'Mutuo']
+      .map((label, i) => ({ id: `extra_${i}`, label, order: 20 + i, hidden: true }));
+    const big = readZip(await zipBytes(buildWorkbook(wbTx, {
+      ...wbMeta, categories: [...SEED_CATEGORIES, ...extra],
+    }, 2026)));
+    const master = big.get('xl/worksheets/sheet1.xml').text;
+
+    // 24 categorie: TOTALE spese in 26, ENTRATE in 30, TOTALE entrate in 35,
+    // BILANCIO in 38, Risparmio in 39.
+    assert(master.includes('<f>SUM(B2:B25)</f>'), 'riga TOTALE spese non è la 26');
+    assert(master.includes('<f>SUM(B31:B34)</f>'), 'riga TOTALE entrate non è la 35');
+    assert(master.includes('<f>B35-B26</f>'), 'Risparmio non punta alle righe giuste');
+
+    // Nessun indice di riga ripetuto e tutti in ordine crescente: è ciò che
+    // rende il foglio apribile.
+    const righe = [...master.matchAll(/<row r="(\d+)"/g)].map((m) => Number(m[1]));
+    eq(righe.length, new Set(righe).size, 'righe duplicate nel foglio');
+    eq(righe, [...righe].sort((a, b) => a - b), 'righe fuori ordine');
+  });
+
   await test('fogli mensili: header uniforme, importi NUMERICI, XML escapato', () => {
     const gennaio = wb.get('xl/worksheets/sheet2.xml').text;
     // Header uguale su tutti i mesi (risolve l'anomalia B di aprile).
@@ -1643,15 +1730,118 @@ async function run() {
   });
 
 
-  await test('la griglia disegna 19 categorie + la tessera Canoni', () => {
+  await test('la griglia disegna 16 categorie + la riga Canoni', () => {
     const screen = createEntryScreen(fakeApp);
     document.body.append(screen.node);
     screen.render();
     const tiles = screen.node.querySelectorAll('.cat-tile');
-    eq(tiles.length, 20, 'la griglia 4x5 deve essere piena');
-    eq(screen.node.querySelectorAll('.cat-tile.special').length, 1);
-    assert([...tiles].at(-1).textContent.includes('Canoni'), 'la tessera Canoni deve essere l\'ultima');
+    eq(tiles.length, 17, 'quattro righe piene piu la riga dei Canoni');
+    eq(screen.node.querySelectorAll('.cat-tile.special.wide').length, 1);
+    assert([...tiles].at(-1).textContent.includes('Canoni'), 'la riga Canoni deve essere l\'ultima');
+    // Sono canoni, non spese che si digitano: nessuna tessera loro.
+    const etichette = [...tiles].map((t) => t.textContent);
+    for (const fuori of ['Spotify', 'Dazn', 'Vodafone']) {
+      assert(!etichette.some((t) => t.startsWith(fuori)), `${fuori} ha ancora una tessera`);
+    }
     screen.node.remove();
+  });
+
+  await test('la riga Canoni elenca quelli attivi e il loro totale', () => {
+    const screen = createEntryScreen(fakeApp);
+    document.body.append(screen.node);
+    screen.render();
+    const tile = screen.node.querySelector('.cat-tile.special');
+    const testo = tile.textContent;
+    // La fixture ha i tre canoni del master, tutti attivi da maggio 2026 in poi.
+    for (const nome of ['Spotify', 'Vodafone', 'Palestra']) {
+      assert(testo.includes(nome), `manca ${nome} nell'elenco: ${testo}`);
+    }
+    assert(testo.includes('84,99'), `manca il totale dei canoni: ${testo}`);
+    screen.node.remove();
+  });
+
+  await test('una categoria creata dai Canoni non prende una tessera', () => {
+    const conNuova = {
+      ...fakeApp,
+      store: {
+        ...fakeApp.store,
+        meta: { ...excelMeta, categories: [...SEED_CATEGORIES, M.makeCategory('Affitto', SEED_CATEGORIES)] },
+      },
+    };
+    const screen = createEntryScreen(conNuova);
+    document.body.append(screen.node);
+    screen.render();
+    eq(screen.node.querySelectorAll('.cat-tile').length, 17, 'la griglia si e allargata');
+    assert(!screen.node.textContent.includes('Affitto'), 'Affitto non deve comparire in griglia');
+    screen.node.remove();
+  });
+
+  // Il pannello dei Canoni con uno store finto che registra le chiamate: è
+  // l'unico modo di provare il percorso "crea la categoria e attaccale il
+  // canone" senza una rete e senza un repo.
+  function canoniDiProva() {
+    const meta = { year: 2026, categories: [...SEED_CATEGORIES], recurring: [] };
+    const scritte = { categorie: [], canoni: null };
+    const sheet = createRecurringSheet({
+      year: 2026,
+      refresh() {},
+      store: {
+        year: 2026,
+        meta,
+        async addCategory(label) {
+          const created = M.makeCategory(label, meta.categories);
+          meta.categories.push(created);
+          scritte.categorie.push(created.id);
+          return created;
+        },
+        async setRecurring(list) { scritte.canoni = list; meta.recurring = list; },
+      },
+    });
+    document.body.append(sheet.node);
+    sheet.open();
+    const [nome, importo, da] = sheet.node.querySelectorAll('input.field');
+    const select = sheet.node.querySelector('select.field');
+    return { sheet, scritte, campi: { nome, importo, da }, select };
+  }
+
+  const conferma = async (sheet) => {
+    [...sheet.node.querySelectorAll('button')].find((b) => b.textContent === 'Aggiungi canone').click();
+    await new Promise((r) => setTimeout(r, 25));
+  };
+
+  await test('dai Canoni si crea una categoria e le si attacca il canone', async () => {
+    const { sheet, scritte, campi, select } = canoniDiProva();
+    select.value = '__nuova__';
+    select.dispatchEvent(new Event('change'));
+    campi.nome.value = 'Affitto';
+    campi.importo.value = '550,00';
+    campi.da.value = '2026-09';
+    await conferma(sheet);
+
+    eq(scritte.categorie, ['affitto'], 'la categoria non è stata creata');
+    eq(scritte.canoni, [{ category: 'affitto', amount: 550, from: '2026-09', to: null }]);
+    sheet.node.close();
+    sheet.node.remove();
+  });
+
+  await test('un importo sbagliato non lascia in giro una categoria orfana', async () => {
+    // L'ordine conta: importo e mese si validano PRIMA di scrivere la
+    // categoria, altrimenti un typo la crea comunque e il canone no.
+    const { sheet, scritte, campi, select } = canoniDiProva();
+    select.value = '__nuova__';
+    select.dispatchEvent(new Event('change'));
+    campi.nome.value = 'Affitto';
+    campi.importo.value = 'abc';
+    await conferma(sheet);
+    eq(scritte.categorie, [], 'categoria creata nonostante l\'importo non valido');
+
+    campi.importo.value = '550';
+    campi.da.value = 'settembre';
+    await conferma(sheet);
+    eq(scritte.categorie, [], 'categoria creata nonostante il mese non valido');
+    eq(scritte.canoni, null);
+    sheet.node.close();
+    sheet.node.remove();
   });
 
   await test('la tessera Canoni apre i canoni, non il foglio della spesa', () => {
@@ -1898,6 +2088,7 @@ async function run() {
     await throwsWith(() => store.deleteTransaction(tx.id), ValidationError);
     await throwsWith(() => store.setIncome('2026-03', 'stipendio', 100), ValidationError);
     await throwsWith(() => store.setRecurring([]), ValidationError);
+    await throwsWith(() => store.addCategory('Affitto'), ValidationError);
     await throwsWith(() => store.importMonth({ schemaVersion: 1, month: '2026-03', transactions: [] }), ValidationError);
 
     // Il dato però resta leggibile.
@@ -2145,22 +2336,28 @@ async function run() {
   });
 
 
-  await test('le etichette seguono l\'app, non il file salvato', () => {
-    // L'id e' la chiave e non si tocca; la label e' solo cio' che si legge.
-    // Nessun punto dell'interfaccia rinomina una categoria, quindi
-    // un'etichetta memorizzata e' sempre una copia di quella spedita con
-    // l'app: se differisce, e' perche' l'app e' stata aggiornata.
+  await test('etichette e visibilità seguono l\'app, non il file salvato', () => {
+    // L'id e' la chiave e non si tocca; label e hidden sono solo il modo in
+    // cui l'app presenta quella chiave. Nessun punto dell'interfaccia rinomina
+    // o nasconde una categoria, quindi cio' che e' memorizzato e' sempre una
+    // copia di quanto spedito con l'app: se differisce, e' perche' l'app e'
+    // stata aggiornata.
     const salvate = [
       { id: 'manutenzione_mazda_sh', label: 'Manutenzione Mazda/SH', order: 14 },
       { id: 'caffe', label: 'Caffè', order: 15 },
-      { id: 'una_mia_categoria', label: 'Una mia categoria', order: 20 },
+      { id: 'spotify', label: 'Spotify', order: 7 },
+      { id: 'una_mia_categoria', label: 'Una mia categoria', order: 20, hidden: true },
     ];
-    const allineate = M.syncCategoryLabels(salvate);
+    const allineate = M.syncShippedCategories(salvate);
     eq(allineate[0].label, 'Mazda SH', 'etichetta non aggiornata');
     eq(allineate[0].id, 'manutenzione_mazda_sh', 'l\'id non deve cambiare mai');
     eq(allineate[0].order, 14, 'il resto del record resta');
     eq(allineate[1].label, 'Caffè');
-    eq(allineate[2].label, 'Una mia categoria', 'le categorie non note vanno lasciate stare');
+    // Spotify e' uscito dalla griglia con la 0.5.0: il flag arriva dall'app,
+    // non dal file, quindi vale anche sui meta.json scritti prima.
+    eq(allineate[2].hidden, true, 'Spotify deve risultare nascosto');
+    eq(allineate[3].label, 'Una mia categoria', 'le categorie non note vanno lasciate stare');
+    eq(allineate[3].hidden, true, 'la visibilità di una categoria tua è un dato suo');
   });
 
   // ===================== costo reale =======================================

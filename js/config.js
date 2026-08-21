@@ -15,9 +15,14 @@
 //        `overflow: hidden` a `clip`: `hidden` lascia la scatola scorrevole da
 //        codice, e showModal() la scorreva per raggiungere il pulsante di
 //        chiusura. Insieme, le tessere di spesa perdono l'ombra.
+// 0.5.0: Spotify, Dazn e Vodafone escono dalla griglia — sono canoni, non
+//        spese che si digitano — e la tessera Canoni si prende l'ultima riga
+//        per intero, mostrando l'elenco di quelli attivi. Dai Canoni si
+//        possono creare categorie nuove: nascono sul database e restano fuori
+//        dalla griglia, che è dimensionata per non scorrere.
 // Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
 // senza di lui il codice nuovo non arriverebbe sul dispositivo.
-export const APP_VERSION = '0.4.5';
+export const APP_VERSION = '0.5.0';
 
 // --- Crittografia -----------------------------------------------------------
 
@@ -70,6 +75,13 @@ export const SCHEMA_VERSION = 1;
 // Ordine e label corrispondono esattamente al master dell'Excel: la label è
 // ciò che finisce in colonna A dei fogli mensili, dove la SUMIF la confronta
 // come stringa.
+//
+// `hidden` non toglie la categoria: la toglie dalla GRIGLIA della nuova spesa.
+// Resta nei totali, nei canoni, nei movimenti e nell'export — Spotify, Dazn e
+// Vodafone esistono solo come canone mensile, e una tessera che nessuno tocca
+// occupa un posto in una griglia che deve entrare nello schermo senza
+// scorrere (F4.7). È anche il difetto delle categorie create dall'app: nascono
+// senza icona, e senza icona una tessera non è riconoscibile.
 export const SEED_CATEGORIES = [
   { id: 'bollette', label: 'Bollette', order: 1 },
   { id: 'alimenti', label: 'Alimenti', order: 2 },
@@ -77,13 +89,13 @@ export const SEED_CATEGORIES = [
   { id: 'casa', label: 'Casa', order: 4 },
   { id: 'shopping', label: 'Shopping', order: 5 },
   { id: 'pasti_fuori', label: 'Pasti fuori', order: 6 },
-  { id: 'spotify', label: 'Spotify', order: 7 },
-  { id: 'dazn', label: 'Dazn', order: 8 },
+  { id: 'spotify', label: 'Spotify', order: 7, hidden: true },
+  { id: 'dazn', label: 'Dazn', order: 8, hidden: true },
   { id: 'benzina', label: 'Benzina', order: 9 },
   { id: 'svago', label: 'Svago', order: 10 },
   { id: 'viaggi', label: 'Viaggi', order: 11 },
   { id: 'palestra', label: 'Palestra', order: 12 },
-  { id: 'vodafone', label: 'Vodafone', order: 13 },
+  { id: 'vodafone', label: 'Vodafone', order: 13, hidden: true },
   { id: 'manutenzione_mazda_sh', label: 'Mazda SH', order: 14 },
   { id: 'caffe', label: 'Caffè', order: 15 },
   { id: 'investimenti', label: 'Investimenti', order: 16 },

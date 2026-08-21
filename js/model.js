@@ -232,24 +232,83 @@ export function validateMeta(data, expectedYear) {
 }
 
 /**
- * Riallinea le etichette delle categorie a quelle dell'app.
+ * Riallinea alle categorie spedite con l'app quelle salvate in `meta.json`.
  *
- * L'`id` è la chiave e non si tocca mai; la `label` è solo ciò che si legge a
- * schermo e finisce nell'Excel. Non esiste nessun punto dell'interfaccia in
- * cui rinominare una categoria, quindi un'etichetta memorizzata è sempre una
- * copia di quella spedita con l'app: se differisce, è perché l'app è stata
- * aggiornata, e sovrascriverla non calpesta nessuna scelta dell'utente.
+ * L'`id` è la chiave e non si tocca mai; `label` e `hidden` sono solo il modo
+ * in cui l'app presenta quella chiave. Non esiste nessun punto
+ * dell'interfaccia in cui rinominare una categoria o nasconderla, quindi ciò
+ * che è memorizzato è sempre una copia di quanto spedito con l'app: se
+ * differisce, è perché l'app è stata aggiornata, e sovrascriverlo non calpesta
+ * nessuna scelta dell'utente. È anche il motivo per cui Spotify, Dazn e
+ * Vodafone spariscono dalla griglia senza toccare i dati già su GitHub.
  *
- * Le categorie che l'app non conosce restano intatte.
+ * Le categorie che l'app non conosce restano intatte, `hidden` compreso: sono
+ * quelle create dai Canoni, e la loro visibilità è un dato loro.
  */
-export function syncCategoryLabels(categories) {
-  const shipped = new Map(SEED_CATEGORIES.map((c) => [c.id, c.label]));
-  return (categories ?? []).map((category) => (shipped.has(category.id)
-    ? { ...category, label: shipped.get(category.id) }
-    : category));
+export function syncShippedCategories(categories) {
+  const shipped = new Map(SEED_CATEGORIES.map((c) => [c.id, c]));
+  return (categories ?? []).map((category) => {
+    const source = shipped.get(category.id);
+    if (!source) return category;
+    // `undefined` e non `false`: JSON.stringify lo omette, quindi il file non
+    // si riempie di flag spenti a ogni scrittura.
+    return { ...category, label: source.label, hidden: source.hidden || undefined };
+  });
+}
+
+// --- Categorie create dall'utente -------------------------------------------
+
+/**
+ * Id di una categoria nuova, ricavato dall'etichetta.
+ *
+ * F2.15 fissa a mano gli id delle 19 categorie del master proprio per non
+ * derivarli da una label che potrebbe cambiare. Qui la derivazione è
+ * inevitabile — l'etichetta è l'unica cosa che l'utente scrive — ma il rischio
+ * di drift non c'è: l'id si calcola UNA volta, alla creazione, e da quel
+ * momento vive in `meta.json` come tutti gli altri. Non esiste un punto in cui
+ * si rinomina una categoria, quindi non esiste un punto in cui ricalcolarlo.
+ */
+export function categoryIdFrom(label) {
+  const id = normalizeText(label)
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // "Caffè" → "caffe"
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+  if (!id) throw new ValidationError(`Nome non utilizzabile: "${label}"`);
+  return id;
+}
+
+/**
+ * Costruisce una categoria nuova. Nasce `hidden`: non ha un'icona, e la
+ * griglia della nuova spesa è dimensionata per entrare nello schermo senza
+ * scorrere (F4.7). Vale ovunque altrove — canoni, totali, movimenti, export.
+ *
+ * @param {string} label come la scrive l'utente
+ * @param {object[]} existing le categorie già in meta.json
+ */
+export function makeCategory(label, existing = []) {
+  const clean = normalizeText(label);
+  if (!clean) throw new ValidationError('Manca il nome della categoria');
+  const id = categoryIdFrom(clean);
+  const clash = existing.find((c) => c.id === id);
+  if (clash) throw new ValidationError(`"${clash.label}" esiste già`);
+  const order = existing.reduce((max, c) => Math.max(max, Number(c.order) || 0), 0) + 1;
+  return { id, label: clean, order, hidden: true };
 }
 
 // --- Ricorrenti (D3) --------------------------------------------------------
+
+/**
+ * I canoni attivi in un mese. `from` e `to` sono mesi in formato `2026-01`,
+ * quindi il confronto è fra stringhe ed è corretto: l'ordine lessicografico di
+ * quel formato coincide con quello cronologico.
+ */
+export function activeRecurring(meta, month) {
+  assertMonth(month);
+  return (meta?.recurring ?? []).filter((r) => String(r.from) <= month
+    && (r.to == null || month <= String(r.to)));
+}
 
 /**
  * Canone attivo per una categoria in un mese. Il canone SI SOMMA alle
@@ -258,13 +317,9 @@ export function syncCategoryLabels(categories) {
  * @returns {number} 0 se nessun canone attivo
  */
 export function recurringFor(meta, categoryId, month) {
-  assertMonth(month);
-  const entries = meta?.recurring ?? [];
   return sumAmounts(
-    entries
-      .filter((r) => r.category === categoryId
-        && String(r.from) <= month
-        && (r.to == null || month <= String(r.to)))
+    activeRecurring(meta, month)
+      .filter((r) => r.category === categoryId)
       .map((r) => r.amount),
   );
 }

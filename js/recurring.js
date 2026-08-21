@@ -10,6 +10,11 @@ import { el, clear, toast, humanError, formatEur } from './ui.js';
 import { uiIcon, categoryIcon } from './icons.js';
 import { parseAmount, isValidMonth, monthLabel } from './model.js';
 
+// Valore sentinella della voce "+ Nuova categoria" nel menu a tendina. I doppi
+// underscore lo tengono fuori dallo spazio degli id veri, che categoryIdFrom
+// non genera mai con un underscore iniziale.
+const NEW_CATEGORY = '__nuova__';
+
 export function createRecurringSheet(app) {
   const body = el('div', { class: 'settings-body' });
 
@@ -112,9 +117,23 @@ export function createRecurringSheet(app) {
     }
 
     // --- nuovo ---
-    const catSelect = el('select', { class: 'field' }, categories.map((c) => el('option', {
-      value: c.id, text: c.label,
-    })));
+    // L'ultima voce non è una categoria: apre il campo per crearne una. Sta
+    // qui e non nella griglia perché è qui che serve — un canone di qualcosa
+    // che le 19 del master non prevedono (un affitto, un'assicurazione) è il
+    // solo motivo per cui finora mancava un posto dove aggiungerne.
+    const catSelect = el('select', { class: 'field' }, [
+      ...categories.map((c) => el('option', { value: c.id, text: c.label })),
+      el('option', { value: NEW_CATEGORY, text: '+ Nuova categoria…' }),
+    ]);
+    const newCatName = el('input', {
+      class: 'field', type: 'text', placeholder: 'Es. Affitto', enterkeyhint: 'done',
+    });
+    const newCatRow = el('label', { class: 'inline-field', hidden: true }, ['Nome', newCatName]);
+    catSelect.addEventListener('change', () => {
+      newCatRow.hidden = catSelect.value !== NEW_CATEGORY;
+      if (!newCatRow.hidden) newCatName.focus();
+    });
+
     const newAmount = el('input', { class: 'field small', type: 'text', inputmode: 'decimal', placeholder: '0,00' });
     const newFrom = el('input', { class: 'field small', type: 'text', value: `${app.store.year}-01` });
 
@@ -122,19 +141,43 @@ export function createRecurringSheet(app) {
       el('div', { class: 'block-title', text: 'Aggiungi' }),
       el('div', { class: 'block-body stack' }, [
         el('label', { class: 'inline-field' }, ['Categoria', catSelect]),
+        newCatRow,
         el('label', { class: 'inline-field' }, ['€ al mese', newAmount]),
         el('label', { class: 'inline-field' }, ['da', newFrom]),
+        el('p', {
+          class: 'hint',
+          text: 'Una categoria creata qui vive nei totali e nell\'export come tutte '
+            + 'le altre, ma non prende una tessera nella griglia della nuova spesa: '
+            + 'quella deve entrare nello schermo senza scorrere.',
+        }),
         el('button', {
           class: 'btn', type: 'button', text: 'Aggiungi canone',
           onclick: async () => {
+            // Importo e mese si validano PRIMA di creare la categoria: un
+            // typo sull'importo lascerebbe altrimenti una categoria nuova e
+            // nessun canone, cioè esattamente il contrario di quanto chiesto.
+            let amount;
+            try {
+              amount = parseAmount(newAmount.value);
+            } catch (err) { toast(humanError(err), 'ko'); return; }
+
             if (!isValidMonth(newFrom.value.trim())) {
               toast('Il mese di inizio va scritto come 2026-09', 'ko');
               return;
             }
+
             try {
+              let categoryId = catSelect.value;
+              if (categoryId === NEW_CATEGORY) {
+                // Due scritture su meta.json, non una: se la seconda fallisce
+                // resta una categoria senza canone — visibile nell'elenco qui
+                // sopra e riutilizzabile al tentativo successivo — invece di
+                // un canone che punta a una categoria inesistente.
+                categoryId = (await app.store.addCategory(newCatName.value)).id;
+              }
               await app.store.setRecurring([...(app.store.meta.recurring ?? []), {
-                category: catSelect.value,
-                amount: parseAmount(newAmount.value),
+                category: categoryId,
+                amount,
                 from: newFrom.value.trim(),
                 to: null,
               }]);

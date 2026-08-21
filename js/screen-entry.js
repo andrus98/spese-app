@@ -1,21 +1,26 @@
 // Schermata 1 — griglia delle categorie e foglio di inserimento.
 
-import { el, clear, formatEur, toast, humanError } from './ui.js';
+import { el, clear, formatEur, formatNum, toast, humanError } from './ui.js';
 import { categoryIcon, uiIcon } from './icons.js';
 import { createKeypad, keypadValue, keypadDisplay } from './keypad.js';
-import { MONTH_NAMES_IT, currentMonth, monthsOfYear, sumAmounts } from './model.js';
+import {
+  MONTH_NAMES_IT, currentMonth, monthsOfYear, sumAmounts, activeRecurring,
+} from './model.js';
 import { SEED_CATEGORIES } from './config.js';
 import { createRecurringSheet } from './recurring.js';
 
 // Ordine FISSO (F4.9): la posizione deve diventare memoria muscolare, quindi
 // la griglia non si riordina mai da sola. Scelto una volta sulla frequenza
 // reale gen-apr: le prime cinque coprono il 75% degli inserimenti.
+//
+// Sedici, non diciannove: Spotify, Dazn e Vodafone sono `hidden` (config.js) e
+// vivono solo come canone: la loro tessera non è mai stata toccata, e le
+// quattro righe che restano lasciano l'ultima ai Canoni per intero.
 const TILE_ORDER = [
   'svago', 'pasti_fuori', 'viaggi', 'tabacchi',
   'benzina', 'alimenti', 'shopping', 'caffe',
   'investimenti', 'manutenzione_mazda_sh', 'palestra', 'bollette',
   'spese_mediche', 'barbiere', 'casa', 'altro',
-  'spotify', 'dazn', 'vodafone',
 ];
 
 export function createEntryScreen(app) {
@@ -33,10 +38,12 @@ export function createEntryScreen(app) {
     const categories = app.store?.meta?.categories ?? SEED_CATEGORIES;
     const byId = new Map(categories.map((c) => [c.id, c]));
 
-    // TILE_ORDER dà l'ordine; eventuali categorie aggiunte dopo finiscono in coda.
+    // TILE_ORDER dà l'ordine; eventuali categorie aggiunte dopo finiscono in
+    // coda, a meno che non siano `hidden` — le tre dei canoni e tutte quelle
+    // create dai Canoni, che nascono senza icona.
     const ordered = [
       ...TILE_ORDER.filter((id) => byId.has(id)).map((id) => byId.get(id)),
-      ...categories.filter((c) => !TILE_ORDER.includes(c.id)),
+      ...categories.filter((c) => !TILE_ORDER.includes(c.id) && !c.hidden),
     ];
 
     clear(grid);
@@ -50,19 +57,50 @@ export function createEntryScreen(app) {
       ]));
     }
 
-    // Ventesima tessera: non registra una spesa, apre i canoni ricorrenti.
-    // Riempie lo slot che restava vuoto e li mette dove si pensa alle spese.
-    // Senza store non ha nulla da leggere né dove scrivere: si spegne.
-    grid.append(el('button', {
-      class: 'cat-tile special', type: 'button', 'aria-label': 'Canoni ricorrenti',
+    grid.append(recurringTile());
+    renderQueue();
+  }
+
+  /**
+   * Ultima riga della griglia, intera: non registra una spesa, apre i canoni
+   * ricorrenti. Larga perché ora ha qualcosa da dire — quali canoni sono
+   * attivi e quanto pesano — che in un quadrato da 80 px non entrerebbe, ed è
+   * l'informazione che le tessere di Spotify, Dazn e Vodafone davano solo per
+   * il fatto di esistere.
+   *
+   * Senza store non ha nulla da leggere né dove scrivere: si spegne.
+   */
+  function recurringTile() {
+    const meta = app.store?.meta;
+    const active = meta ? activeRecurring(meta, currentMonth()) : [];
+    const labelOf = new Map((meta?.categories ?? SEED_CATEGORIES).map((c) => [c.id, c.label]));
+
+    // Senza simbolo di valuta: sono tre o quattro voci su una riga sola, e
+    // ripetere "€" a ogni importo la riempirebbe senza aggiungere nulla. Il
+    // totale a destra, quello sì, resta in euro.
+    const summary = !app.store
+      ? 'Disponibili quando torna la rete'
+      : active.length
+        ? active.map((r) => `${labelOf.get(r.category) ?? r.category} ${formatNum(r.amount)}`).join(' · ')
+        : 'Nessun canone attivo';
+
+    return el('button', {
+      class: 'cat-tile special wide', type: 'button', 'aria-label': 'Canoni ricorrenti',
       disabled: !app.store,
       onclick: () => recurring.open(),
     }, [
       el('span', { class: 'ico', html: categoryIcon('canoni') }),
-      el('span', { class: 'label', text: 'Canoni' }),
-    ]));
-
-    renderQueue();
+      el('span', { class: 'wide-main' }, [
+        el('span', { class: 'label', text: 'Canoni' }),
+        el('span', { class: 'sub', text: summary }),
+      ]),
+      active.length
+        ? el('span', {
+          class: 'wide-total num',
+          text: formatEur(sumAmounts(active.map((r) => r.amount))),
+        })
+        : null,
+    ]);
   }
 
   /**
@@ -314,10 +352,6 @@ function createSheet(app) {
 export function monthTotal(store, month) {
   if (!store) return 0;
   const fromTransactions = sumAmounts(store.transactionsOf(month).map((t) => t.amount));
-  const fromRecurring = sumAmounts(
-    (store.meta?.recurring ?? [])
-      .filter((r) => String(r.from) <= month && (r.to == null || month <= String(r.to)))
-      .map((r) => r.amount),
-  );
+  const fromRecurring = sumAmounts(activeRecurring(store.meta, month).map((r) => r.amount));
   return sumAmounts([fromTransactions, fromRecurring]);
 }

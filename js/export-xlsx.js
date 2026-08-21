@@ -136,7 +136,12 @@ function masterSheet(meta, year) {
   ]));
 
   // --- ENTRATE: righe 25-30 ---
-  const incomeHeader = 25;
+  // La geometria del master originale è a righe fisse, ma il blocco SPESE ora
+  // può crescere: le categorie si aggiungono dai Canoni. Con le 19 del master
+  // il conto dà esattamente 25 e il foglio è identico a prima; con più
+  // categorie ENTRATE scende invece di finire SOPRA il totale delle spese, che
+  // produrrebbe righe fuori ordine e un .xlsx che Excel rifiuta di aprire.
+  const incomeHeader = Math.max(25, totalRow + 4);
   rows.push(headerRow(incomeHeader, 'ENTRATE'));
 
   INCOME_SOURCES.forEach((source, index) => {
@@ -161,7 +166,7 @@ function masterSheet(meta, year) {
   ]));
 
   // --- BILANCIO: righe 33-34 ---
-  const balanceHeader = 33;
+  const balanceHeader = incomeTotal + 3; // 33 con le entrate che finiscono in 30
   rows.push(headerRow(balanceHeader, 'BILANCIO'));
 
   const savingsRow = balanceHeader + 1; // 34

@@ -7,9 +7,9 @@ import { encryptJSON, decryptEnvelope } from './crypto.js';
 import { isNotFound, isConflict } from './github.js';
 import { KIND, ValidationError } from './errors.js';
 import {
-  makeTransaction, monthsOfYear, yearOf, dedupeById, sortTransactions,
+  makeTransaction, makeCategory, monthsOfYear, yearOf, dedupeById, sortTransactions,
   emptyMonthFile, emptyMeta, validateMonthFile, validateMeta, normalizeText,
-  syncCategoryLabels,
+  syncShippedCategories,
 } from './model.js';
 import { metaPath, monthPath, yearDir, DATA_ROOT, SEED_CATEGORIES } from './config.js';
 
@@ -124,8 +124,9 @@ export class Store {
     try {
       const { data, sha } = await this.client.getJSON(metaPath(year));
       const file = validateMeta(await decryptEnvelope(data, this.key, this.salt), year);
-      // Le etichette seguono l'app, non il file: vedi syncCategoryLabels.
-      file.categories = syncCategoryLabels(file.categories);
+      // Etichette e visibilità seguono l'app, non il file: vedi
+      // syncShippedCategories.
+      file.categories = syncShippedCategories(file.categories);
       return { file, sha };
     } catch (err) {
       if (isNotFound(err)) return { file: null, sha: null }; // lo crea ensureMeta
@@ -364,6 +365,31 @@ export class Store {
   async setRecurring(recurring) {
     this.#assertWritable();
     return this.#writeMeta((meta) => { meta.recurring = recurring; });
+  }
+
+  /**
+   * Crea una categoria e la salva in meta.json.
+   *
+   * Vale per l'anno caricato e solo per quello: le categorie si ereditano al
+   * rollover del 1° gennaio (ensureMeta), quindi una creata a dicembre 2026 si
+   * ritrova nel 2027 senza doverla rifare, mentre gli anni già chiusi restano
+   * come sono — ed è giusto: una categoria che nel 2025 non esisteva non deve
+   * comparire nel suo Excel.
+   *
+   * @param {string} label come la scrive l'utente
+   * @returns {Promise<object>} la categoria creata, con il suo id
+   */
+  async addCategory(label) {
+    this.#assertWritable();
+    const category = makeCategory(label, this.meta?.categories ?? []);
+    await this.#writeMeta((meta) => {
+      // `mutate` viene rieseguito sul meta FRESCO dopo un 409: se nel
+      // frattempo l'altro dispositivo ha creato la stessa categoria, qui non
+      // se ne aggiunge una seconda con lo stesso id.
+      const list = meta.categories ?? [];
+      meta.categories = list.some((c) => c.id === category.id) ? list : [...list, category];
+    });
+    return category;
   }
 
   /** Chiude o riapre l'anno. Non passa da #assertWritable, ovviamente. */

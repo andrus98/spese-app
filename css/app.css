@@ -231,32 +231,30 @@ input { font: inherit; color: inherit; }
    I Canoni, che non registrano una spesa, sono l'inverso: fondo bianco e
    segno colorato. Lo scambio e' il modo piu' rapido per dire "questa tessera
    fa un'altra cosa", perche' si legge prima ancora di riconoscere l'icona.
-   Le tessere di spesa non hanno ombra: sul fondo quasi nero il colore pieno
-   basta gia' a staccarle, e diciannove aloni uno accanto all'altro sporcano
-   la griglia invece di darle profondita'. L'ombra resta solo sui Canoni,
-   dove serve a dare volume a una tessera chiara. */
+   "Stessa sfumatura" e' da leggere alla lettera: nessuna luce radiale,
+   nessun bordo chiaro, nessuna ombra. Il riquadro Entrate e' colore pieno e
+   basta, e ogni strato in piu' sulla tessera romperebbe proprio la parentela
+   che il colore serve a dichiarare — moltiplicata per diciannove tessere,
+   sporcherebbe anche la griglia. Il volume resta solo sui Canoni, dove serve
+   a dare corpo all'unica tessera chiara. */
 .cat-tile {
   aspect-ratio: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 7px;
   padding: 6px 3px;
   border-radius: var(--r-tile);
-  /* Due strati: la sfumatura di base piu' una luce radiale in alto a
-     sinistra. Da sola la lineare appiattisce; il riflesso obliquo da' alla
-     tessera un volume che si vede anche a 83 px. */
-  background:
-    radial-gradient(115% 85% at 26% 10%, rgba(255, 255, 255, .34) 0%, rgba(255, 255, 255, 0) 58%),
-    linear-gradient(140deg, var(--accent) 0%, #6C4BFF 100%);
-  border: 1.5px solid rgba(255, 255, 255, .18);
+  /* Identica a .card.hero: un solo strato, la stessa lineare. */
+  background: linear-gradient(140deg, var(--accent) 0%, #6C4BFF 100%);
+  border: none;
   color: #FFFFFF;
   box-shadow: none;
   transition: transform .12s var(--ease), box-shadow .12s var(--ease), background .12s var(--ease);
 }
 .cat-tile:active {
+  /* Il tocco lo dicono la scala e la sfumatura piu' scura: nessuno strato in
+     piu', gli stessi due colori abbassati. */
   transform: scale(.94);
-  background:
-    radial-gradient(115% 85% at 26% 10%, rgba(255, 255, 255, .20) 0%, rgba(255, 255, 255, 0) 58%),
-    linear-gradient(140deg, #346ADB 0%, #5D41DB 100%);
+  background: linear-gradient(140deg, #346ADB 0%, #5D41DB 100%);
 }
 .cat-tile svg { width: 26px; height: 26px; color: #FFFFFF; }
 
@@ -279,12 +277,14 @@ input { font: inherit; color: inherit; }
 .cat-tile.special {
   /* Il fondo resta bianco anche premuto: e' l'unica tessera chiara della
      griglia, e cambiarne il colore al tocco le toglierebbe proprio il segno
-     che la distingue. Su una superficie chiara il volume lo fa quindi
-     l'OMBRA e non la luce — un riflesso bianco su fondo bianco e'
-     invisibile: la velatura interna in basso a destra e' il lato opposto
-     alla luce delle altre tessere, ed e' blu come il loro riempimento. */
+     che la distingue. Un fondo bianco su fondo quasi nero pero' non sta su da
+     solo: qui il volume lo fa l'ombra, ed e' l'unica tessera che ne ha una.
+     La velatura interna in basso a destra e' blu come il riempimento delle
+     tessere di spesa — l'ombra la lega alla griglia invece di isolarla. */
   background: #FFFFFF;
-  border-color: rgba(61, 123, 255, .5);
+  /* Bordo per intero e non solo il colore: da quando le tessere di spesa non
+     ne hanno piu' uno, non c'e' piu' spessore da ereditare. */
+  border: 1.5px solid rgba(61, 123, 255, .5);
   box-shadow:
     0 7px 18px rgba(61, 123, 255, .32),
     inset 0 1px 0 rgba(255, 255, 255, 1),
@@ -299,11 +299,45 @@ input { font: inherit; color: inherit; }
 .cat-tile.special svg { color: var(--accent); }
 .cat-tile.special .label { color: var(--accent); }
 
+/* I Canoni si prendono l'ultima riga per intero. Le quattro righe di tessere
+   quadrate restano quadrate: la riga in fondo e' alta quanto il suo contenuto,
+   e lo spazio che avanza torna dove tornava prima, distribuito da
+   `align-content: space-evenly`. Da qui la fila si legge in orizzontale —
+   segno, nome, elenco, totale — che e' l'unico modo per far stare a schermo
+   quali canoni sono attivi. */
+.cat-tile.wide {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 11px 15px;
+}
+.cat-tile.wide .ico { flex: none; display: flex; }
+.cat-tile.wide .wide-main { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; }
+.cat-tile.wide .label {
+  text-align: left; font-size: 13.5px;
+  -webkit-line-clamp: 1;
+}
+/* L'elenco dei canoni attivi: piccolo, perche' e' un promemoria e non un
+   dato da leggere ogni volta. Due righe al massimo, poi taglia. */
+.cat-tile.wide .sub {
+  font-size: 10.5px; font-weight: 600; line-height: 1.3;
+  color: color-mix(in srgb, var(--accent) 75%, transparent);
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.cat-tile.wide .wide-total {
+  flex: none; font-size: 15px; font-weight: 800; color: var(--accent);
+}
+
 /* Schermi bassi: si stringe invece di traboccare. */
 @media (max-height: 700px) {
   :root { --gap: 8px; --r-tile: 17px; }
   .cat-tile svg { width: 22px; height: 22px; }
   .cat-tile .label { font-size: 10px; }
+  .cat-tile.wide { padding: 9px 12px; }
+  .cat-tile.wide .label { font-size: 12.5px; }
 }
 
 /* ============================ Sheet di inserimento ====================== */
