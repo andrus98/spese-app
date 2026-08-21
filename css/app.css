@@ -149,11 +149,20 @@ input { font: inherit; color: inherit; }
 
 /* ============================ Tab bar =================================== */
 
+/* La barra tocca il bordo BASSO dello schermo: niente safe area in fondo.
+   Riservandola, sotto le etichette restavano 34px di barra vuota (misurato in
+   standalone su un 393×852: box 760→852, contenuto 760→818). Il fondo della
+   barra è `--surface` al 92% su `--bg`, cioè sette livelli RGB di differenza:
+   su OLED quella striscia non si legge come parte della barra, si legge come
+   schermo nero spento sotto la nav bar. Scelta esplicita, contro `F4.5`: la
+   home bar di iOS passa sopra le etichette centrali per un paio di pixel, e
+   va bene così. I 34px recuperati finiscono nella riga `1fr` del guscio,
+   quindi nella griglia delle categorie, che su schermi bassi era al limite
+   (F4.7). */
 .tabbar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  height: var(--tabbar-h);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border-top: 1px solid var(--hairline);
   backdrop-filter: blur(20px);
@@ -523,7 +532,10 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3p
 .toast {
   position: fixed;
   left: 50%; transform: translateX(-50%);
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
+  /* Ancorato SOPRA la tab bar: questa misura deve seguire l'altezza della
+     barra, altrimenti il messaggio galleggia staccato. Niente safe area, per
+     lo stesso motivo per cui non ce l'ha più la barra. */
+  bottom: calc(var(--tabbar-h) + 14px);
   padding: 11px 17px; border-radius: var(--r-pill);
   background: var(--surface-3); color: var(--text);
   font-size: 13.5px; font-weight: 600;

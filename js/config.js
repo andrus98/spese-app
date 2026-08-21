@@ -15,9 +15,14 @@
 //        `overflow: hidden` a `clip`: `hidden` lascia la scatola scorrevole da
 //        codice, e showModal() la scorreva per raggiungere il pulsante di
 //        chiusura. Insieme, le tessere di spesa perdono l'ombra.
+// 0.4.6: la nav bar tocca il bordo basso dello schermo. Riservare
+//        `env(safe-area-inset-bottom)` le lasciava sotto 34px di barra vuota
+//        che su OLED si leggono come schermo nero: la barra sembrava
+//        galleggiare sopra una fascia spenta. Ora la home bar di iOS passa
+//        sopra le etichette, per scelta.
 // Il bump non è cosmetico: dà il nome alla cache del service worker, quindi
 // senza di lui il codice nuovo non arriverebbe sul dispositivo.
-export const APP_VERSION = '0.4.5';
+export const APP_VERSION = '0.4.6';
 
 // --- Crittografia -----------------------------------------------------------
 
